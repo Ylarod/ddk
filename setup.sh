@@ -1,8 +1,4 @@
-# export CLANG_URL_PREFIX=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads
-
-# wget $CLANG_URL_PREFIX/master-kernel-build-2021/clang-r416183b.tar.gz
-# wget $CLANG_URL_PREFIX/master-kernel-build-2022/clang-r450784e.tar.gz
-# wget $CLANG_URL_PREFIX/main-kernel-build-2023/clang-r487747c.tar.gz
+#!/usr/bin/env bash
 
 function setup_clang()
 {
