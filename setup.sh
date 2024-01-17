@@ -65,6 +65,15 @@ setup_source android12-5.10
 setup_source android13-5.15
 setup_source android14-6.1
 
+echo "[+] Patch kernel"
+set -x
+for dir in src/*; do 
+    pushd $dir
+    sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
+    popd
+done
+set +x
+
 echo "[+] Build kernel"
 build_kernel clang-r416183b android12-5.10
 build_kernel clang-r450784e android13-5.15
