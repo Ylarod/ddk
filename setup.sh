@@ -9,7 +9,7 @@ function setup_clang()
         return
     fi
     local url_prefix=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads
-    local url=$url_prefix/$branch/clang-$version.tar.gz
+    local url=$url_prefix/$branch/$version.tar.gz
     echo "[+] Download from $url"
     wget $url
     mkdir -p clang/$version
