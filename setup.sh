@@ -13,7 +13,7 @@ function setup_clang()
     echo "[+] Download from $url"
     wget $url
     mkdir -p clang/$version
-    tar xzvf clang-$version.tar.gz -C clang/$version
+    tar xzvf $version.tar.gz -C clang/$version
 }
 
 function setup_source()
