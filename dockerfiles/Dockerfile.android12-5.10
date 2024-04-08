@@ -1,0 +1,26 @@
+FROM ubuntu:23.10
+
+RUN apt-get update && apt-get install -y \
+    make \
+    pahole \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ddk
+
+COPY clang/clang-r416183b ./clang/clang-r416183b
+COPY src/android12-5.10 ./src/android12-5.10
+COPY kdir/android12-5.10 ./kdir/android12-5.10
+
+ENV DDK_ROOT=/opt/ddk \
+    CROSS_COMPILE=aarch64-linux-gnu- \
+    ARCH=arm64 \
+    LLVM=1 \
+    LLVM_IAS=1
+
+ENV KERNEL_SRC=$DDK_ROOT/kdir/android12-5.10 \
+    CLANG_PATH=$DDK_ROOT/clang/clang-r416183b/bin
+
+ENV PATH=$CLANG_PATH:$PATH
+    
+
+ENTRYPOINT bash
