@@ -14,7 +14,9 @@ setup_clang main-kernel-build-2023 clang-r487747c
 
 echo "[+] Setup kernel source"
 setup_source android12-5.10
+setup_source android13-5.10
 setup_source android13-5.15
+setup_source android14-5.15
 setup_source android14-6.1
 
 echo "[+] Patch kernel"
@@ -28,7 +30,9 @@ set +x
 
 echo "[+] Build kernel"
 build_kernel clang-r416183b android12-5.10
+build_kernel clang-r450784e android13-5.10
 build_kernel clang-r450784e android13-5.15
+build_kernel clang-r487747c android14-5.15
 build_kernel clang-r487747c android14-6.1
 
 touch setup.lock
