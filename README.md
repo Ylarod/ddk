@@ -6,7 +6,49 @@
 
 如果不想下载 Clang 的话，使用 NDK Clang 也能编译通过，但是**可能**编译产物的结构体偏移会有所不同。
 
-## 工具包使用办法
+## Docker 镜像使用教程
+
+从 [Release](https://github.com/Kernel-SU/ddk/releases/latest) 中下载并解压镜像文件，然后导入镜像文件
+
+```bash
+docker image load -i docker-ddk-android12-5.10.tar
+docker image load -i docker-ddk-android13-5.10.tar
+docker image load -i docker-ddk-android13-5.15.tar
+docker image load -i docker-ddk-android14-5.15.tar
+docker image load -i docker-ddk-android14-6.1.tar
+```
+
+### 构建模块：
+
+```bash
+# x86 devices
+docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
+
+# m1 devices using orbstack
+docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make
+```
+
+### 清理构建产物
+
+```bash
+# x86 devices
+docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
+
+# m1 devices using orbstack
+docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make clean
+```
+
+### 可交互Shell
+
+```bash
+# x86 devices
+docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
+
+# m1 devices using orbstack
+docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10
+```
+
+## 工具包制作办法
 
 clone 后执行
 
