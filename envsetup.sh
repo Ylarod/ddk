@@ -1,19 +1,56 @@
-export DDK_ROOT=/home/ylarod/KernelCompile/ddk
+#!/usr/bin/env bash
 
-# android12-5.10
-# export KERNEL_SRC=$DDK_ROOT/kdir/android12-5.10
-# export CLANG_PATH=$DDK_ROOT/clang/clang-r416183b/bin
+function setup_clang()
+{
+    local branch=$1
+    local version=$2
+    if [ -d clang/$version ]; then
+        echo "[!] $version already exists, skip"
+        return
+    fi
+    local url_prefix=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads
+    local url=$url_prefix/$branch/$version.tar.gz
+    echo "[+] Download from $url"
+    wget $url
+    mkdir -p clang/$version
+    tar xzvf $version.tar.gz -C clang/$version
+}
 
-# android13-5.15
-# export KERNEL_SRC=$DDK_ROOT/kdir/android13-5.15
-# export CLANG_PATH=$DDK_ROOT/clang/clang-r450784e/bin
+function setup_source()
+{
+    local branch=$1
+    if [ -d src/$branch ]; then
+        echo "[!] $branch already exists, skip"
+        return
+    fi
+    echo "[+] Clone $branch"
+    git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 src/$branch
+}
 
-# android14-6.1
-export KERNEL_SRC=$DDK_ROOT/kdir/android14-6.1
-export CLANG_PATH=$DDK_ROOT/clang/clang-r487747c/bin
-
-export PATH=$CLANG_PATH:$PATH
-export CROSS_COMPILE=aarch64-linux-gnu-
-export ARCH=arm64
-export LLVM=1
-export LLVM_IAS=1
+function build_kernel()
+{
+    local clang_version=$1
+    local branch=$2
+    if [ -d kdir/$branch ]; then
+        echo "[!] $branch already exists, skip"
+        return
+    fi
+    local cache_path=$PATH
+    local out_path=$(realpath kdir/$branch)
+    local clang_path=$(realpath clang/$clang_version/bin)
+    echo "[+] Building $branch"
+    # setup env
+    set -x
+    export PATH=$clang_path:$cache_path
+    export CROSS_COMPILE=aarch64-linux-gnu-
+    export ARCH=arm64
+    export LLVM=1
+    export LLVM_IAS=1
+    cd src/$branch
+    make O=$out_path gki_defconfig
+    make O=$out_path -j$(nproc)
+    set +x
+    cd ../..
+    # restore path
+    export PATH=$cache_path
+}

@@ -32,10 +32,10 @@ cat kdir/android14-6.1/Module.symvers | grep module_layout
 0xea759d7f      module_layout   vmlinux EXPORT_SYMBOL
 ```
 
-### 环境初始化脚本：
+### 模块构建环境初始化脚本：
 
 ```sh
-export DDK_ROOT=/home/ylarod/KernelCompile/ddk
+export DDK_ROOT=/opt/ddk
 
 # android12-5.10
 export KERNEL_SRC=$DDK_ROOT/kdir/android12-5.10
