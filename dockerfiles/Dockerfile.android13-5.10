@@ -22,5 +22,5 @@ ENV KERNEL_SRC=$DDK_ROOT/kdir/android13-5.10 \
 
 ENV PATH=$CLANG_PATH:$PATH
     
-
-ENTRYPOINT bash
+CMD ["/bin/bash"]
+ENTRYPOINT ["/bin/bash", "-C"]
