@@ -1,9 +1,6 @@
 name: Build and Release ddk
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
 
 jobs:
