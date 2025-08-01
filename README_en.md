@@ -1,14 +1,14 @@
-# 内核驱动开发工具包 (Kernel Driver Development Kit)
+# Kernel Driver Development Kit (DDK)
 
-该工具包旨在快速开发内核模块，但**不保证**内核模块能够完全兼容对应版本的内核。
+This toolkit is designed for rapid kernel module development, but it **does not guarantee** full compatibility with the corresponding kernel version.
 
-如果需要完全兼容性，请下载完整内核代码并自行编译，具体方法请参考相关文档。
+For perfect compatibility, you need to download the full kernel source code and compile it yourself. Refer to the relevant documentation for details.
 
-如果不想下载 Clang，可以使用 NDK Clang 进行编译，但**可能**会导致编译产物的结构体偏移有所不同。
+If you prefer not to download Clang, you can use NDK Clang for compilation. However, the compiled output **might** have different structure offsets.
 
-## Docker 镜像使用教程
+## Docker Image Usage Guide
 
-从 [Release](https://github.com/Kernel-SU/ddk/releases/latest) 下载并解压镜像文件，然后导入镜像：
+Download and extract the image files from the [Release](https://github.com/Kernel-SU/ddk/releases/latest), then import the images:
 
 ```bash
 docker image load -i docker-ddk-android12-5.10.tar
@@ -18,49 +18,49 @@ docker image load -i docker-ddk-android14-5.15.tar
 docker image load -i docker-ddk-android14-6.1.tar
 ```
 
-### 构建模块
+### Build Modules
 
 ```bash
-# x86 设备
+# x86 devices
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
 
-# M1 设备使用 Orbstack
+# M1 devices using Orbstack
 docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make
 ```
 
-### 清理构建产物
+### Clean Build Artifacts
 
 ```bash
-# x86 设备
+# x86 devices
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
 
-# M1 设备使用 Orbstack
+# M1 devices using Orbstack
 docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make clean
 ```
 
-### 进入交互式 Shell
+### Interactive Shell
 
 ```bash
-# x86 设备
+# x86 devices
 docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
 
-# M1 设备使用 Orbstack
+# M1 devices using Orbstack
 docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10
 ```
 
-## 工具包制作方法
+## How to Build the Toolkit
 
-克隆仓库后执行：
+Clone the repository and execute:
 
 ```sh
 ./setup.sh
 ```
 
-编译完成后，可以参考 `module_template` 创建模块。
+After compilation, you can create modules by referring to `module_template`.
 
-构建 DDK Release 可参考 `scripts` 目录下的脚本。
+To build the DDK release, refer to the scripts in the `scripts` directory.
 
-### 简单校验编译正确性
+### Simple Compilation Verification
 
 ```sh
 cat kdir/android12-5.10/Module.symvers | grep module_layout
@@ -68,7 +68,7 @@ cat kdir/android13-5.15/Module.symvers | grep module_layout
 cat kdir/android14-6.1/Module.symvers | grep module_layout
 ```
 
-对比输出：
+Compare the output:
 
 ```
 0x7c24b32d      module_layout   vmlinux EXPORT_SYMBOL
@@ -76,7 +76,7 @@ cat kdir/android14-6.1/Module.symvers | grep module_layout
 0xea759d7f      module_layout   vmlinux EXPORT_SYMBOL
 ```
 
-### 模块构建环境初始化脚本
+### Module Build Environment Initialization Script
 
 ```sh
 export DDK_ROOT=/opt/ddk
@@ -100,7 +100,7 @@ export LLVM=1
 export LLVM_IAS=1
 ```
 
-### 内核模块 Makefile 示例
+### Kernel Module Makefile Example
 
 ```Makefile
 MODULE_NAME := Shami
@@ -128,44 +128,44 @@ clean:
 	make -C $(KDIR) M=$(MDIR) clean
 ```
 
-### 配置代码提示
+### Configure Code Suggestions
 
-安装 VSCode 的 `clangd` 插件。
+Install the `clangd` plugin for VSCode.
 
-执行：
+Execute:
 
 ```sh
 python3 .vscode/generate_compdb.py -O $DDK_ROOT/kdir/android14-6.1 .
 ```
 
-或者直接：
+Or simply:
 
 ```sh
 make compdb
 ```
 
-### 添加新版本
+### Adding a New Version
 
-以 `android16-6.12` 为例：
+For example, `android16-6.12`:
 
-1. 查看内核清单：<https://android.googlesource.com/kernel/manifest/+/refs/heads/common-android16-6.12/default.xml>
+1. Check the kernel manifest: <https://android.googlesource.com/kernel/manifest/+/refs/heads/common-android16-6.12/default.xml>
 
 ```
 <default revision="main-kernel-2025" remote="aosp" sync-j="4" />
 ```
 
-记录 `revision` 为 `main-kernel-2025`，即 `clang_branch_name`。
+Record `revision` as `main-kernel-2025`, which is the `clang_branch_name`.
 
-2. 查看内核配置：<https://android.googlesource.com/kernel/common/+/refs/heads/android16-6.12/build.config.constants>
+2. Check the kernel configuration: <https://android.googlesource.com/kernel/common/+/refs/heads/android16-6.12/build.config.constants>
 
 ```
 CLANG_VERSION=r536225
 ```
 
-记录 `CLANG_VERSION` 为 `clang_name`。
+Record `CLANG_VERSION` as `clang_name`.
 
-3. `source_name` 为 `android16-6.12`。
+3. `source_name` is `android16-6.12`.
 
-4. 编辑 `setup.sh` 和 `.github/workflows/release.yml`，添加新版本。
+4. Edit `setup.sh` and `.github/workflows/release.yml` to add the new version.
 
-5. 在 `dockerfiles` 目录下新增 `Dockerfile.android16-6.12`。
+5. Add a new `Dockerfile.android16-6.12` in the `dockerfiles` directory.

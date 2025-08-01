@@ -48,6 +48,31 @@ function build_kernel()
     export LLVM_IAS=1
     cd src/$branch
     make O=$out_path gki_defconfig
+    if [ "${LTO}" = "none" ]; then
+        scripts/config --file $out_path/.config \
+        -d LTO_CLANG \
+        -e LTO_NONE \
+        -d LTO_CLANG_THIN \
+        -d LTO_CLANG_FULL \
+        -d THINLTO
+    elif [ "${LTO}" = "thin" ]; then
+        # This is best-effort; some kernels don't support LTO_THIN mode
+        # THINLTO was the old name for LTO_THIN, and it was 'default y'
+        scripts/config --file $out_path/.config \
+        -e LTO_CLANG \
+        -d LTO_NONE \
+        -e LTO_CLANG_THIN \
+        -d LTO_CLANG_FULL \
+        -e THINLTO
+    elif [ "${LTO}" = "full" ]; then
+        # THINLTO was the old name for LTO_THIN, and it was 'default y'
+        scripts/config --file $out_path/.config \
+        -e LTO_CLANG \
+        -d LTO_NONE \
+        -d LTO_CLANG_THIN \
+        -e LTO_CLANG_FULL \
+        -d THINLTO
+    fi
     make O=$out_path -j$(nproc)
     set +x
     cd ../..
