@@ -11,11 +11,13 @@ If you prefer not to download Clang, you can use NDK Clang for compilation. Howe
 Download and extract the image files from the [Release](https://github.com/Kernel-SU/ddk/releases/latest), then import the images:
 
 ```bash
-docker image load -i docker-ddk-android12-5.10.tar
-docker image load -i docker-ddk-android13-5.10.tar
-docker image load -i docker-ddk-android13-5.15.tar
-docker image load -i docker-ddk-android14-5.15.tar
-docker image load -i docker-ddk-android14-6.1.tar
+docker pull ghcr.io/ylarod/ddk:android12-5.10
+docker pull ghcr.io/ylarod/ddk:android13-5.10
+docker pull ghcr.io/ylarod/ddk:android13-5.15
+docker pull ghcr.io/ylarod/ddk:android14-5.15
+docker pull ghcr.io/ylarod/ddk:android14-6.1
+docker pull ghcr.io/ylarod/ddk:android15-6.6
+docker pull ghcr.io/ylarod/ddk:android16-6.12
 ```
 
 ### Build Modules
