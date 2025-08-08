@@ -32,21 +32,13 @@ docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:andro
 ### 清理构建产物
 
 ```bash
-# x86 设备
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
-
-# M1 设备使用 Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make clean
 ```
 
 ### 进入交互式 Shell
 
 ```bash
-# x86 设备
 docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
-
-# M1 设备使用 Orbstack
-docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10
 ```
 
 ## 工具包制作方法
