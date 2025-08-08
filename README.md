@@ -24,9 +24,6 @@ docker pull ghcr.io/ylarod/ddk:android16-6.12
 ```bash
 # x86 设备
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
-
-# M1 设备使用 Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make
 ```
 
 ### 清理构建产物
