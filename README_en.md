@@ -25,9 +25,6 @@ docker pull ghcr.io/ylarod/ddk:android16-6.12
 ```bash
 # x86 devices
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
-
-# M1 devices using Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make
 ```
 
 ### Clean Build Artifacts
@@ -35,9 +32,6 @@ docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:andro
 ```bash
 # x86 devices
 docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
-
-# M1 devices using Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10 make clean
 ```
 
 ### Interactive Shell
@@ -45,9 +39,6 @@ docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:andro
 ```bash
 # x86 devices
 docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
-
-# M1 devices using Orbstack
-docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ddk:android12-5.10
 ```
 
 ## How to Build the Toolkit
