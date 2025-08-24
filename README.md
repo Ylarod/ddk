@@ -23,24 +23,24 @@ docker pull ghcr.io/ylarod/ddk:android16-6.12
 
 ```bash
 # x86 设备
-docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
+docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
 ```
 
 ### 清理构建产物
 
 ```bash
-docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
+docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make clean
 ```
 
 ### 进入交互式 Shell
 
 ```bash
-docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
+docker run -it --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10
 ```
 
 ## 工具包制作方法
 
-克隆仓库后执行：
+克隆仓库 **到 /opt/ddk** 后执行：
 
 ```sh
 ./setup.sh
