@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# If not running in /opt/ddk, bind-mount current directory to /opt/ddk and cd there
+if [ "$PWD" != "/opt/ddk" ]; then
+  if [ ! -d /opt/ddk ]; then
+    sudo mkdir -p /opt/ddk
+  fi
+  if ! mountpoint -q /opt/ddk; then
+    echo "[+] Bind-mounting $PWD -> /opt/ddk"
+    sudo mount --bind "$PWD" /opt/ddk
+  fi
+  cd /opt/ddk || { echo "Failed to cd /opt/ddk"; exit 1; }
+fi
+
 source ./envsetup.sh
 
 if [ -f setup.lock ]; then
