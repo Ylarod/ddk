@@ -14,7 +14,7 @@ fi
 
 source ./envsetup.sh
 
-rm -rf kdir/android-*
+rm -rf kdir/android*
 
 echo "[+] Build kernel"
 build_kernel clang-r416183b android12-5.10
