@@ -1,4 +1,4 @@
-export DDK_ROOT=/home/ylarod/KernelCompile/ddk
+export DDK_ROOT=/opt/ddk
 
 export KERNEL_SRC=$DDK_ROOT/kdir/android12-5.10
 export CLANG_PATH=$DDK_ROOT/clang/clang-r416183b/bin
