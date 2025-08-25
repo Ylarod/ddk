@@ -6,54 +6,99 @@ For perfect compatibility, you need to download the full kernel source code and 
 
 If you prefer not to download Clang, you can use NDK Clang for compilation. However, the compiled output **might** have different structure offsets.
 
-## Docker Image Usage Guide
+## Docker Image Usage (Recommended: Pull from GHCR)
 
-Download and extract the image files from the [Release](https://github.com/Kernel-SU/ddk/releases/latest), then import the images:
+Images are published to GitHub Container Registry (GHCR). It's recommended to pull images directly from GHCR instead of downloading large tar files from Releases:
 
 ```bash
+# Pull image (example)
 docker pull ghcr.io/ylarod/ddk:android12-5.10
-docker pull ghcr.io/ylarod/ddk:android13-5.10
-docker pull ghcr.io/ylarod/ddk:android13-5.15
-docker pull ghcr.io/ylarod/ddk:android14-5.15
-docker pull ghcr.io/ylarod/ddk:android14-6.1
-docker pull ghcr.io/ylarod/ddk:android15-6.6
-docker pull ghcr.io/ylarod/ddk:android16-6.12
+
+docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
 ```
+
+If older documentation or scripts mention downloading `.tar` and importing images, that is outdated — prefer `ghcr.io/ylarod/ddk:<ver>`.
 
 ### Build Modules
 
 ```bash
 # x86 devices
-docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make
+docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
+
+# M1 devices using Orbstack
+docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make
 ```
 
 ### Clean Build Artifacts
 
 ```bash
 # x86 devices
-docker run --rm -v /tmp/testko:/build -w /build ddk:android12-5.10 make clean
+docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make clean
+
+# M1 devices using Orbstack
+docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make clean
 ```
 
 ### Interactive Shell
 
 ```bash
 # x86 devices
-docker run -it --rm -v /tmp/testko:/build -w /build ddk:android12-5.10
+docker run -it --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10
+
+# M1 devices using Orbstack
+docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10
 ```
+
+## About scripts and building images
+
+Note: the `scripts/` directory no longer contains logic to build Docker images — image building is managed by the `docker/Makefile`.
+
+If you only need to build images locally or in CI, use the `docker/Makefile` targets:
+
+- Build/ensure clang toolchains:
+
+```bash
+make -C docker toolchains
+```
+
+- Build a single version (automatically packs src/kdir):
+
+```bash
+make -C docker build VER=android14-6.1
+```
+
+- Build all versions in the matrix:
+
+```bash
+make -C docker build-all
+```
+
+- Push during build (set `PUSH=1`) after logging in to GHCR:
+
+```bash
+# Login to GHCR
+echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+# Build and push
+make -C docker build VER=android14-6.1 PUSH=1 PLAT=linux/amd64,linux/arm64
+```
+
+`make pack` writes `.pkg/src.<VER>.tar` and `.pkg/kdir.<VER>.tar`, which are used for offline or CI builds.
 
 ## How to Build the Toolkit
 
-Clone the repository and execute:
+Clone the repo and run:
 
 ```sh
 ./setup.sh
 ```
 
-After compilation, you can create modules by referring to `module_template`.
+After compilation, create modules by referring to `module_template`.
 
-To build the DDK release, refer to the scripts in the `scripts` directory.
+To build the DDK release, use `docker/Makefile` for automated builds and pushes.
 
-### Simple Compilation Verification
+
+### Quick verification of build correctness
 
 ```sh
 cat kdir/android12-5.10/Module.symvers | grep module_layout
@@ -61,7 +106,7 @@ cat kdir/android13-5.15/Module.symvers | grep module_layout
 cat kdir/android14-6.1/Module.symvers | grep module_layout
 ```
 
-Compare the output:
+Compare outputs:
 
 ```
 0x7c24b32d      module_layout   vmlinux EXPORT_SYMBOL
@@ -93,51 +138,7 @@ export LLVM=1
 export LLVM_IAS=1
 ```
 
-### Kernel Module Makefile Example
-
-```Makefile
-MODULE_NAME := Shami
-$(MODULE_NAME)-objs := core.o
-obj-m := $(MODULE_NAME).o
-
-ccflags-y += -Wno-declaration-after-statement
-ccflags-y += -Wno-unused-variable
-ccflags-y += -Wno-int-conversion
-ccflags-y += -Wno-unused-result
-ccflags-y += -Wno-unused-function
-ccflags-y += -Wno-builtin-macro-redefined -U__FILE__ -D__FILE__='""'
-
-KDIR := $(KERNEL_SRC)
-MDIR := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-
-$(info -- KDIR: $(KDIR))
-$(info -- MDIR: $(MDIR))
-
-all:
-	make -C $(KDIR) M=$(MDIR) modules
-compdb:
-	python3 $(MDIR)/.vscode/generate_compdb.py -O $(KDIR) $(MDIR)
-clean:
-	make -C $(KDIR) M=$(MDIR) clean
-```
-
-### Configure Code Suggestions
-
-Install the `clangd` plugin for VSCode.
-
-Execute:
-
-```sh
-python3 .vscode/generate_compdb.py -O $DDK_ROOT/kdir/android14-6.1 .
-```
-
-Or simply:
-
-```sh
-make compdb
-```
-
-### Adding a New Version
+### Adding a new version
 
 For example, `android16-6.12`:
 
@@ -161,4 +162,4 @@ Record `CLANG_VERSION` as `clang_name`.
 
 4. Edit `setup.sh` and `.github/workflows/release.yml` to add the new version.
 
-5. Add a new `Dockerfile.android16-6.12` in the `dockerfiles` directory.
+5. Modify MATRIX (add the new entry in `docker/Makefile`'s MATRIX)

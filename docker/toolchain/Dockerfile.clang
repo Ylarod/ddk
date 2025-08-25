@@ -1,0 +1,26 @@
+FROM ubuntu:24.04
+
+WORKDIR /opt/ddk
+
+ARG CLANG_VER
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    make \
+    pahole \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --link clang/${CLANG_VER} ./clang/${CLANG_VER}
+
+ENV DDK_ROOT=/opt/ddk \
+    CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
+    PATH=/opt/ddk/clang/${CLANG_VER}/bin:$PATH
+
+LABEL org.opencontainers.image.title="DDK toolchain ${CLANG_VER}" \
+      org.opencontainers.image.description="DDK Clang toolchain base image (offline)" \
+      org.opencontainers.image.source="https://github.com/Ylarod/ddk" \
+      org.opencontainers.image.documentation="https://github.com/Ylarod/ddk#readme" \
+      org.opencontainers.image.url="https://github.com/Ylarod/ddk" \
+      io.ddk.project="ddk" \
+      io.ddk.clang.version="${CLANG_VER}"
+
+CMD ["/bin/bash"]
