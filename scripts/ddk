@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+prog=$(basename "$0")
+
+usage() {
+  cat <<EOF
+Usage: $prog <command> [options] [-- <make-args>]
+
+Commands:
+  pull [--target <target>] <target>           Pull image ghcr.io/ylarod/ddk:<target>
+  build [--target <target>] [-- <make-args>]
+                                              Run 'make' inside container (for building)
+  clean [--target <target>]
+                                              Run 'make clean' inside container
+  shell [--target <target>]
+                                              Start an interactive shell in the container
+
+Options:
+  --target, -t   image tag like 'android12-5.10' (defaults to DDK_TARGET env if unset)
+  (docker platform is forced to linux/amd64)
+  -h, --help     show this help
+
+Examples:
+  $prog pull android12-5.10
+  $prog build --target android12-5.10 -- CFLAGS=-O2
+  $prog clean android12-5.10
+  $prog shell -t android12-5.10
+EOF
+}
+
+if [ $# -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+cmd=$1; shift
+
+TARGET=""
+MAKE_ARGS=()
+
+# Simple flag/positional parser
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target|-t)
+      TARGET="$2"; shift 2;;
+    --help|-h)
+      usage; exit 0;;
+    --)
+      shift
+      MAKE_ARGS=("$@")
+      break
+      ;;
+    -*)
+      # unknown flag for wrapper - treat as error
+      echo "Unknown option: $1" >&2; exit 2;
+      ;;
+    *)
+      # positional: if no target yet, take this as target; otherwise treat as a make arg
+      if [[ -z "$TARGET" ]]; then
+        TARGET="$1"
+      else
+        MAKE_ARGS+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$TARGET" ]]; then
+  # Try environment variable fallback
+  if [[ -n "${DDK_TARGET:-}" ]]; then
+    TARGET="$DDK_TARGET"
+  else
+    echo "Error: target is required. Use --target or provide it as the first positional argument, or set DDK_TARGET." >&2
+    usage
+    exit 2
+  fi
+fi
+
+IMAGE="ghcr.io/ylarod/ddk:${TARGET}"
+
+# Build docker run base args
+# Force platform to linux/amd64 to ensure consistent x86 toolchain
+DOCKER_COMMON_ARGS=(--platform linux/amd64 --rm -v "$(pwd)":/build -w /build)
+
+run_docker() {
+  # run_docker [extra docker args...] -- <cmd...>
+  local docker_args=("${DOCKER_COMMON_ARGS[@]}")
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--" ]]; then shift; break; fi
+    docker_args+=("$1"); shift
+  done
+  # remaining args are command to run
+  docker run "${docker_args[@]}" "$IMAGE" "$@"
+}
+
+case "$cmd" in
+  pull)
+    echo "Pulling image: $IMAGE"
+    docker pull "$IMAGE"
+    ;;
+
+  build)
+    echo "Building in container: $IMAGE"
+    # If MAKE_ARGS empty, just call make
+    if [[ ${#MAKE_ARGS[@]} -eq 0 ]]; then
+      run_docker -- make
+    else
+      run_docker -- make "${MAKE_ARGS[@]}"
+    fi
+    ;;
+
+  clean)
+    echo "Cleaning in container: $IMAGE"
+    run_docker -- make clean
+    ;;
+
+  shell)
+    echo "Starting interactive shell in: $IMAGE"
+    # Prefer bash if available inside image, fall back to sh
+    docker run -it "${DOCKER_COMMON_ARGS[@]}" "$IMAGE" sh -c 'if [ -x /bin/bash ]; then exec /bin/bash; else exec /bin/sh; fi'
+    ;;
+
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage
+    exit 2
+    ;;
+esac
+
+exit 0

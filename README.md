@@ -6,7 +6,39 @@
 
 如果不想下载 Clang，可以使用 NDK Clang 进行编译，但**可能**会导致编译产物的结构体偏移有所不同。
 
-## Docker 镜像使用教程（推荐：从 GHCR 拉取）
+## Docker 镜像使用教程（推荐）
+
+仓库内包含一个便利脚本 `scripts/ddk`，封装了常用的 docker 命令，强制使用 `--platform linux/amd64` 并把当前目录挂载到容器的 `/build`：
+
+用法示例：
+
+```bash
+# 拉取镜像
+./scripts/ddk pull android12-5.10
+
+# 构建
+./scripts/ddk build --target android12-5.10
+
+# 传递 make 参数
+./scripts/ddk build --target android12-5.10 -- CFLAGS=-O2
+
+# 清理
+./scripts/ddk clean --target android12-5.10
+
+# 交互式 shell
+./scripts/ddk shell --target android12-5.10
+```
+
+如果你不想在每次命令中传入 target，可以设置环境变量 `DDK_TARGET`：
+
+```bash
+export DDK_TARGET=android12-5.10
+./scripts/ddk build   # 会使用 DDK_TARGET
+```
+
+脚本位置：`scripts/ddk`（请确保它有可执行权限）。
+
+## Docker 镜像使用教程（传统）
 
 镜像已发布到 GitHub Container Registry（GHCR）。推荐直接从 GHCR 拉取镜像，而不是从 Release 下载大型 tar：
 
