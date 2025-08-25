@@ -13,6 +13,8 @@ MATRIX := \
 
 REG ?= ghcr.io/ylarod
 IMG ?= ddk
+DEV_IMG ?= ddk-dev
+BASE_IMG ?= ddk-base
 PUSH ?= 0
 FORCE ?= 0
 PLAT ?= linux/amd64
@@ -22,7 +24,9 @@ REV  := $(shell git -C $(ROOT) rev-parse HEAD)
 BUILDKIT ?= 1
 DOCKER ?= docker
 
-.PHONY: list toolchains build build-all pack clean
+.PHONY: list toolchains build build-all pack clean \
+	push push-all push-toolchains \
+	base devcontainer push-devcontainer devcontainer-all push-devcontainer-all
 
 list:
 	@for i in $(MATRIX); do echo $$i; done
@@ -114,3 +118,45 @@ push-all:
 
 clean:
 	rm -rf $(ROOT)/.pkg
+
+base:
+	@echo "==> Building base image $(REG)/$(BASE_IMG):latest";
+	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,--load) \
+	  -f $(ROOT)/docker/devcontainer/Dockerfile.base \
+	  -t $(REG)/$(BASE_IMG):latest $(ROOT)
+
+devcontainer:
+	@if [ -z "$(VER)" ]; then echo "Usage: make devcontainer VER=<androidX-Y>"; exit 1; fi
+	@if ! $(DOCKER) image inspect $(REG)/$(BASE_IMG):latest >/dev/null 2>&1; then \
+	  echo "==> Base image $(REG)/$(BASE_IMG):latest not found locally. Building..."; \
+	  $(MAKE) base || exit $$?; \
+	 fi
+	@CLANG=$$(echo "$(MATRIX)" | tr ' ' '\n' | grep "^$(VER):" | cut -d: -f2); \
+	 if [ -z "$$CLANG" ]; then echo "CLANG not found for $(VER)"; exit 2; fi; \
+	 echo "==> Building $(REG)/$(DEV_IMG):$(VER) (CLANG=$$CLANG) from $(REG)/$(IMG):$(VER)"; \
+	 DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,--load) \
+	  --build-arg VER=$(VER) \
+	  --build-arg CLANG_VER=$$CLANG \
+	  -f $(ROOT)/docker/devcontainer/Dockerfile \
+	  -t $(REG)/$(DEV_IMG):$(VER) $(ROOT)
+
+push-devcontainer:
+	@if [ -z "$(VER)" ]; then echo "Usage: make push-devcontainer VER=<androidX-Y>"; exit 1; fi
+	@echo "==> Pushing $(REG)/$(DEV_IMG):$(VER)";
+	$(DOCKER) push $(REG)/$(DEV_IMG):$(VER)
+
+devcontainer-all:
+	@for pair in $(MATRIX); do \
+	  VER=$${pair%%:*}; \
+	  echo "==> [dev] Building $(REG)/$(DEV_IMG):$$VER"; \
+	  $(MAKE) devcontainer VER=$$VER || exit $$?; \
+	 done
+
+push-devcontainer-all:
+	@for pair in $(MATRIX); do \
+	  VER=$${pair%%:*}; \
+	  echo "==> [dev] Pushing $(REG)/$(DEV_IMG):$$VER"; \
+	  $(MAKE) push-devcontainer VER=$$VER || exit $$?; \
+	 done

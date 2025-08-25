@@ -1,0 +1,19 @@
+{
+  "name": "ddk-module-dev",
+  "image": "ghcr.io/ylarod/ddk-dev:android12-5.10",
+  "remoteUser": "root",
+  "postCreateCommand": "echo Devcontainer ready",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-github-actions",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-ceintl.vscode-language-pack-zh-hans"
+      ]
+    }
+  }
+}
