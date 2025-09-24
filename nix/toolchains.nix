@@ -4,39 +4,46 @@
 # Preferred: fetch from upstream with fixed-output hash. Fallback: use repo-local clang/<ver> if present.
 
 let
-  defaultBranches = {
-    "clang-r416183b" = "master-kernel-build-2021";
-    "clang-r450784e" = "master-kernel-build-2022";
-    "clang-r487747c" = "main-kernel-build-2023";
-    "clang-r510928"  = "main-kernel-build-2024";
-    "clang-r536225"  = "main-kernel-2025";
+  # Unified metadata per toolchain
+  metadata = {
+    "clang-r416183b" = { branch = "master-kernel-build-2021"; sha256 = "sha256-aYvEWU1gt++qu8m4W4vuRjAvMmIg2p2FslnD+44jLgo="; };
+    "clang-r450784e" = { branch = "master-kernel-build-2022"; sha256 = "sha256-EsgydAK2kVP8V068nsjAEzUT37aEto/H41YjlHydAOM="; };
+    "clang-r487747c" = { branch = "main-kernel-build-2023";  sha256 = "sha256-MqN/Ybuxh5WCZKFUnuNPjYAV9AP/wr0kd7Xeeen/ddk="; };
+    "clang-r510928"  = { branch = "main-kernel-build-2024";  sha256 = "sha256-Z7YgUK6XiqqrE8hp7JZnmZGWXaXmIlJGLQQvbwHBpGc="; };
+    "clang-r536225"  = { branch = "main-kernel-2025";       sha256 = "sha256-HulH36XS922nar0xYP0CEHiAatdeWYmz0E4uJjX2N2c="; };
   };
 in
 { version
-, branch ? lib.getAttr version defaultBranches
-, sha256s ? {}  # e.g. { "clang-r416183b" = "sha256-..."; }
+, branch ? null
+, sha256s ? {}  # optional external override: { "clang-r*" = "sha256-..."; }
 }:
 let
-  localPath = ../clang/${version};
+  localDir = ../clang/${version};
+  haveLocalDir = builtins.pathExists localDir;
+
+  meta = if metadata ? ${version} then metadata.${version} else {};
+  effectiveBranch = if branch != null then branch
+                    else if meta ? branch then meta.branch
+                    else (throw "Missing branch for ${version}; pass 'branch' or extend metadata in nix/toolchains.nix");
+  effectiveSha = if sha256s ? ${version} then sha256s.${version}
+                 else if meta ? sha256 then meta.sha256 else null;
 in
-if builtins.pathExists localPath then
+if haveLocalDir then
   pkgs.runCommand "${version}-vendor" {
     preferLocalBuild = true;
     allowSubstitutes = false;
   } ''
     mkdir -p "$out"
-    cp -a ${localPath}/. "$out/"
+    cp -a ${localDir}/. "$out/"
   ''
 else
   let
-    url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${branch}/${version}.tar.gz";
+    url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${effectiveBranch}/${version}.tar.gz";
     src = pkgs.fetchurl {
       inherit url;
-      # TODO: fill in the correct hash for ${version}
-      sha256 = lib.getAttr version sha256s or "0000000000000000000000000000000000000000000000000000";
+      sha256 = if effectiveSha != null then effectiveSha else (throw "Missing sha256 for ${version}; vendor ../clang/${version} or pass sha256s");
     };
   in pkgs.runCommand "${version}-fetched" {} ''
     mkdir -p "$out"
     tar -xzf ${src} -C "$out"
   ''
-
