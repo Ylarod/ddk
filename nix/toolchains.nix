@@ -1,7 +1,6 @@
 { pkgs, lib }:
 
-# Build or vendor Android Clang toolchains.
-# Preferred: fetch from upstream with fixed-output hash. Fallback: use repo-local clang/<ver> if present.
+# Always fetch Android Clang toolchains from upstream with fixed-output hash.
 
 let
   # Unified metadata per toolchain
@@ -18,31 +17,18 @@ in
 , sha256s ? {}  # optional external override: { "clang-r*" = "sha256-..."; }
 }:
 let
-  localDir = ../clang/${version};
-  haveLocalDir = builtins.pathExists localDir;
-
   meta = if metadata ? ${version} then metadata.${version} else {};
   effectiveBranch = if branch != null then branch
                     else if meta ? branch then meta.branch
                     else (throw "Missing branch for ${version}; pass 'branch' or extend metadata in nix/toolchains.nix");
   effectiveSha = if sha256s ? ${version} then sha256s.${version}
                  else if meta ? sha256 then meta.sha256 else null;
-in
-if haveLocalDir then
-  let
-    # Import the local directory into the Nix store once, then reference it via symlink.
-    src = builtins.path { path = localDir; name = "clang-${version}"; };
-  in pkgs.linkFarm "${version}-vendor" [
-    { name = "clang/${version}"; path = src; }
-  ]
-else
-  let
-    url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${effectiveBranch}/${version}.tar.gz";
-    # Use fetchTarball so the hash is computed over unpacked contents (stable across gzip recompression).
-    src = builtins.fetchTarball {
-      inherit url;
-      sha256 = if effectiveSha != null then effectiveSha else (throw "Missing sha256 for ${version}; vendor ../clang/${version} or pass sha256s");
-    };
-  in pkgs.linkFarm "${version}-fetched" [
-    { name = "clang/${version}"; path = src; }
-  ]
+  url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${effectiveBranch}/${version}.tar.gz";
+  # Use fetchTarball so the hash is computed over unpacked contents (stable across gzip recompression).
+  src = builtins.fetchTarball {
+    inherit url;
+    sha256 = if effectiveSha != null then effectiveSha else (throw "Missing sha256 for ${version}; pass sha256 via 'sha256s' or extend metadata");
+  };
+in pkgs.linkFarm "${version}-fetched" [
+  { name = "clang/${version}"; path = src; }
+]

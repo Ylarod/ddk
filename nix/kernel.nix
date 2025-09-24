@@ -13,20 +13,13 @@
 }:
 
 let
-  # Prefer vendored sources if present; otherwise fetch from AOSP.
-  localSrcPath = ../src/${ver};
-  srcDrv = if builtins.pathExists localSrcPath then
-    pkgs.runCommand "${ver}-src-vendor" { preferLocalBuild = true; allowSubstitutes = false; } ''
-      mkdir -p "$out"
-      cp -a ${localSrcPath}/. "$out/"
-    ''
-  else
-    pkgs.fetchgit {
-      url = "https://android.googlesource.com/kernel/common";
-      rev = srcRev;
-      fetchSubmodules = false;
-      leaveDotGit = false;
-    };
+  # Always fetch kernel sources from AOSP to avoid local workspace dependency.
+  # Use builtins.fetchGit to avoid requiring a fixed-output hash.
+  srcDrv = builtins.fetchGit {
+    url = "https://android.googlesource.com/kernel/common";
+    rev = srcRev;
+    submodules = false;
+  };
 in
 pkgs.stdenv.mkDerivation {
   pname = "ddk-kernel-${ver}";
@@ -72,49 +65,23 @@ pkgs.stdenv.mkDerivation {
     export LLVM=1
     export LLVM_IAS=1
 
-    # Out-of-tree build dir
-    OUT="$PWD/.out"
-    mkdir -p "$OUT"
+    # Use an out-of-tree build directory to keep sources clean
+    builddir="$(pwd)/.build"
+    mkdir -p "$builddir"
 
-    make O="$OUT" gki_defconfig
-
-    # Adjust LTO per request, matching envsetup.sh logic
-    if [ "${lib.escapeShellArg (lto or "")}" = "none" ]; then
-      scripts/config --file "$OUT/.config" \
-        -d LTO_CLANG \
-        -e LTO_NONE \
-        -d LTO_CLANG_THIN \
-        -d LTO_CLANG_FULL \
-        -d THINLTO || true
-    elif [ "${lib.escapeShellArg (lto or "")}" = "thin" ]; then
-      scripts/config --file "$OUT/.config" \
-        -e LTO_CLANG \
-        -d LTO_NONE \
-        -e LTO_CLANG_THIN \
-        -d LTO_CLANG_FULL \
-        -e THINLTO || true
-    elif [ "${lib.escapeShellArg (lto or "")}" = "full" ]; then
-      scripts/config --file "$OUT/.config" \
-        -e LTO_CLANG \
-        -d LTO_NONE \
-        -d LTO_CLANG_THIN \
-        -e LTO_CLANG_FULL \
-        -d THINLTO || true
-    fi
-
-    make O="$OUT" -j"${toString (pkgs.stdenv.hostPlatform.parsed.cpu.cores or 4)}"
+    make O="$builddir" gki_defconfig
+    make O="$builddir" modules_prepare -j"${toString (pkgs.stdenv.hostPlatform.parsed.cpu.cores or 4)}"
   '';
 
   installPhase = ''
     set -eux
-    # Export build dir
-    mkdir -p "$kernel"
-    cp -a .out/. "$kernel/"
-    # Export patched source tree
-    mkdir -p "$source"
-    cp -a . "$source/"
-    # Keep $out minimal to satisfy multi-output rules
-    mkdir -p "$out"
+    mkdir -p "$out" "$kernel" "$source"
+    # kernel output: prepared build tree (O= directory)
+    cp -a .build/. "$kernel/"
+    # source output: patched source tree
+    shopt -s dotglob
+    cp -a --no-preserve=ownership --preserve=mode * "$source/"
+    # minimal marker in $out
     printf '%s\n' "${ver}" > "$out/version"
   '';
 
@@ -125,4 +92,3 @@ pkgs.stdenv.mkDerivation {
     platforms = [ "x86_64-linux" ];
   };
 }
-

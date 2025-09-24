@@ -36,75 +36,15 @@ jobs:
             clang_branch_name: "main-kernel-2025"
 
     steps:
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 8192
-          temp-reserve-mb: 2048
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+      - uses: wimpysworld/nothing-but-nix@main
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v13
-
-      - name: Use magic Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v7
-
-      # Stage 1: Initialize toolchain and source using Nix/devshell
-      - name: Setup Clang toolchain (script)
-        run: |
-          nix develop .#kernel --command bash -lc '
-            set -eux
-            source ./envsetup.sh
-            setup_clang "${{ matrix.clang_branch_name }}" "${{ matrix.clang_name }}"
-          '
-
-      - name: Setup kernel source (clone)
-        run: |
-          nix develop .#kernel --command bash -lc '
-            set -euo pipefail
-            source ./envsetup.sh
-            setup_source "${{ matrix.source_name }}"
-          '
-
-      - name: Patch kernel (disable modpost check_exports)
-        run: |
-          nix develop .#kernel --command bash -lc '
-            set -eux
-            for dir in src/*; do
-              pushd "$dir"
-              sed -i "/check_exports(mod);/s/^/\/\//" scripts/mod/modpost.c || true
-              popd
-            done
-          '
-
-      # Stage 2: Build kernel on host (inside Nix devshell)
-      - name: Build kernel
-        run: |
-          nix develop .#kernel --command bash -lc '
-            set -eux
-            source ./envsetup.sh
-            LTO=thin build_kernel "${{ matrix.clang_name }}" "${{ matrix.source_name }}"
-          '
-
-      # Stage 3: Package images with Nix (uses .pkg/src.$VER.tar & kdir.$VER.tar)
-      - name: Pack src/kdir
-        run: |
-          nix develop .#kernel --command bash -lc '
-            set -eux
-            make pack VER="${{ matrix.source_name }}" FORCE=1
-            ls -lh .pkg
-          '
+        uses: DeterminateSystems/nix-installer-action@main
 
       - name: Build ddk images (ddk and ddk-dev)
         run: |
           nix build .#${{ matrix.source_name }}
-          nix build .#ddk-dev/${{ matrix.source_name }}
+          nix build .#ddk-dev.$(echo "${{ matrix.source_name }}" | tr '-.' '__')
 
       - name: Push to GHCR (optional)
         if: ${{ secrets.GHCR_TOKEN != '' }}
@@ -112,4 +52,4 @@ jobs:
           DEST_CREDS: ${{ github.actor }}:${{ secrets.GHCR_TOKEN }}
         run: |
           nix run .#${{ matrix.source_name }}.copyToRegistry -- --dest-creds "${DEST_CREDS}"
-          nix run .#ddk-dev/${{ matrix.source_name }}.copyToRegistry -- --dest-creds "${DEST_CREDS}"
+          nix run .#ddk-dev.$(echo "${{ matrix.source_name }}" | tr '-.' '__').copyToRegistry -- --dest-creds "${DEST_CREDS}"

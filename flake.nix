@@ -10,11 +10,6 @@
   outputs = { self, nixpkgs, nix2container, ... }:
   let
     forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" ];
-    resolveWorkspace =
-      let
-        ws = builtins.getEnv "DDK_ROOT";
-        pwd = builtins.getEnv "PWD";
-      in if ws != "" then ws else if pwd != "" then pwd else ".";
   in
   {
     packages = forAllSystems (system:
@@ -24,52 +19,18 @@
         n2c = (import nix2container { inherit pkgs system; }).nix2container;
 
         versions = import ./nix/versions.nix { inherit lib; };
-        # Resolve once per-system to avoid repeating in helpers
-        workspace = resolveWorkspace;
+
+        # Use network-fetched toolchains and kernel builder
+        toolchainFor = import ./nix/toolchains.nix { inherit pkgs lib; };
+        kernelBuild = import ./nix/kernel.nix { inherit pkgs lib; };
 
         # ------------------------------------------------------------
-        # Inputs: local toolchain and kernel trees from workspace
+        # Inputs: fetch toolchain and build kernel
         # ------------------------------------------------------------
-        mkToolchain = { version }:
-          let
-            localDirPath = "${workspace}/clang/${version}";
-          in if builtins.pathExists localDirPath then
-            let
-              src = builtins.path { path = localDirPath; name = "clang-${version}"; };
-            in pkgs.linkFarm "${version}-vendor" [
-              { name = "clang/${version}"; path = src; }
-            ]
-          else
-            throw "Missing local clang/${version}. Run: source ./envsetup.sh && setup_clang <branch> ${version}";
+        mkToolchain = { version }: toolchainFor { inherit version; };
 
         mkKernel = { ver, srcRev, srcBranch, toolchain, lto ? null }:
-          let
-            pkgDir = "${workspace}/.pkg";
-            srcTarPath = "${pkgDir}/src.${ver}.tar";
-            kdirTarPath = "${pkgDir}/kdir.${ver}.tar";
-
-            haveSrcTar = builtins.pathExists srcTarPath;
-            haveKdirTar = builtins.pathExists kdirTarPath;
-
-            srcTar = if haveSrcTar then builtins.path { path = srcTarPath; name = "src.${ver}.tar"; } else null;
-            kdirTar = if haveKdirTar then builtins.path { path = kdirTarPath; name = "kdir.${ver}.tar"; } else null;
-
-            script = if haveSrcTar && haveKdirTar then ''
-                tar -xf ${srcTar}  -C "$source" --strip-components=1
-                tar -xf ${kdirTar} -C "$kernel" --strip-components=1
-              '' else ''
-                echo "Missing prebuilt artifacts for ${ver}. Require .pkg/src.${ver}.tar and .pkg/kdir.${ver}.tar"
-                exit 2
-              '';
-          in pkgs.runCommand "ddk-prebuilt-${ver}" {
-            outputs = [ "out" "kernel" "source" ];
-            nativeBuildInputs = [ pkgs.bash pkgs.coreutils pkgs.gnutar ];
-          } ''
-            set -eux
-            mkdir -p "$source" "$kernel" "$out"
-            ${script}
-            printf '%s\n' "${ver}" > "$out/version"
-          '';
+          kernelBuild { inherit ver srcRev srcBranch lto; toolchain = toolchain; };
 
         # ------------------------------------------------------------
         # Base layer and image
@@ -129,7 +90,7 @@
         };
 
         # ------------------------------------------------------------
-        # Layers and images: clang, kernel, ddk, ddk-dev
+        # Layers and images: clang layer, kernel layer, ddk, ddk-dev
         # ------------------------------------------------------------
         mkClangLayer = clangVer:
           let tool = mkToolchain { version = clangVer; };
@@ -143,10 +104,15 @@
           let
             spec = versions.${ver};
             tool = mkToolchain { version = spec.clang; };
-            kdrv = mkKernel { ver = ver; srcRev = spec.srcRev; srcBranch = spec.srcBranch; toolchain = tool; };
+            kdrv = mkKernel {
+              ver = ver;
+              srcRev = spec.srcRev;
+              srcBranch = spec.srcBranch;
+              toolchain = "${tool}/clang/${spec.clang}";
+            };
           in n2c.buildLayer {
             copyToRoot = pkgs.linkFarm "ddk-tree-${ver}" [
-              { name = "opt/ddk/kdir/${ver}"; path = kdrv.kernel; }
+              { name = "opt/ddk/kernel/${ver}"; path = kdrv.kernel; }
               { name = "opt/ddk/src/${ver}"; path = kdrv.source; }
             ];
           };
@@ -169,27 +135,6 @@
           };
         };
 
-        # ddk/kernel image: only /opt/ddk/src/<ver> and /opt/ddk/kdir/<ver>
-        mkKernelImage = ver:
-          let spec = versions.${ver}; in
-          n2c.buildImage {
-            name = "ghcr.io/ylarod/ddk/kernel";
-            tag = ver;
-            layers = [ (mkKernelLayer ver) ];
-            config = {
-              Env = [ "DDK_ROOT=/opt/ddk" ];
-              Cmd = [ "bash" ];
-              Labels = {
-                "org.opencontainers.image.title" = "ddk/kernel ${ver}";
-                "org.opencontainers.image.description" = "Kernel src+kdir for ${ver}";
-                "io.ddk.project" = "ddk";
-                "io.ddk.android.version" = ver;
-                "io.ddk.clang.version" = spec.clang;
-                "io.ddk.variant" = "kernel";
-              };
-            };
-          };
-
         # ddk image: composed from base + ddk/clang + ddk/kernel
         mkDdkImage = ver:
           let
@@ -207,7 +152,7 @@
                 "ARCH=arm64"
                 "LLVM=1"
                 "LLVM_IAS=1"
-                "KERNEL_SRC=/opt/ddk/kdir/${ver}"
+                "KERNEL_SRC=/opt/ddk/kernel/${ver}"
                 "CLANG_PATH=/opt/ddk/clang/${spec.clang}/bin"
                 "PATH=/opt/ddk/clang/${spec.clang}/bin:${baseEnv}/bin:/usr/bin:/bin"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
@@ -247,7 +192,7 @@
                 "ARCH=arm64"
                 "LLVM=1"
                 "LLVM_IAS=1"
-                "KERNEL_SRC=/opt/ddk/kdir/${ver}"
+                "KERNEL_SRC=/opt/ddk/kernel/${ver}"
                 "CLANG_PATH=/opt/ddk/clang/${spec.clang}/bin"
                 "PATH=/opt/ddk/clang/${spec.clang}/bin:${baseEnv}/bin:${devEnv}/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
@@ -277,7 +222,6 @@
         # Namespaced attribute sets for clarity in CLI usage
         ddkImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDdkImage ver; }) (lib.attrNames versions));
         ddkDevImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDevImage ver; }) (lib.attrNames versions));
-        ddkKernelImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkKernelImage ver; }) (lib.attrNames versions));
 
         # Unique clang versions across all entries
         clangVersions = lib.unique (map (spec: spec.clang) (lib.attrValues versions));
@@ -290,7 +234,6 @@
         # Friendly grouping
         ddk = ddkImages;          # .#ddk.<ver>
         ddk-dev = ddkDevImages;   # .#ddk-dev.<ver>
-        ddk-kernel = ddkKernelImages; # .#ddk-kernel.<ver>
         ddk-clang = ddkClangImages;   # .#ddk-clang.<clang>
 
         # Back-compat: expose ddk images at top-level by version name (no dev override)
