@@ -33,17 +33,18 @@ if haveLocalDir then
     preferLocalBuild = true;
     allowSubstitutes = false;
   } ''
-    mkdir -p "$out"
-    cp -a ${localDir}/. "$out/"
+    mkdir -p "$out/clang/${version}"
+    cp -a ${localDir}/. "$out/clang/${version}/"
   ''
 else
   let
     url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${effectiveBranch}/${version}.tar.gz";
-    src = pkgs.fetchurl {
+    # Use fetchTarball so the hash is computed over unpacked contents (stable across gzip recompression).
+    src = builtins.fetchTarball {
       inherit url;
       sha256 = if effectiveSha != null then effectiveSha else (throw "Missing sha256 for ${version}; vendor ../clang/${version} or pass sha256s");
     };
   in pkgs.runCommand "${version}-fetched" {} ''
-    mkdir -p "$out"
-    tar -xzf ${src} -C "$out"
+    mkdir -p "$out/clang"
+    ln -s ${src} "$out/clang/${version}"
   ''

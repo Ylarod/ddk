@@ -34,37 +34,26 @@
               # lto = null; # optionally set: "none" | "thin" | "full"
             };
 
-            root = pkgs.runCommand "ddk-root-${ver}" {} ''
-              set -eux
-              mkdir -p $out/opt/ddk/clang/${spec.clang}
-              cp -a ${tool}/. $out/opt/ddk/clang/${spec.clang}/
-
-              mkdir -p $out/opt/ddk/kdir/${ver}
-              cp -a ${kdrv.kernel}/. $out/opt/ddk/kdir/${ver}/
-
-              mkdir -p $out/opt/ddk/src/${ver}
-              cp -a ${kdrv.source}/. $out/opt/ddk/src/${ver}/
-            '';
-
-            rootWithTools = pkgs.buildEnv {
-              name = "ddk-root-tools-${ver}";
-              paths = [
-                pkgs.bashInteractive
-                pkgs.coreutils
-                pkgs.gnumake
-                pkgs.findutils
-                pkgs.gnugrep
-                pkgs.gawk
-                pkgs.gzip
-                pkgs.xz
-                pkgs.util-linux
-                pkgs.dwarves # pahole
-                root
-              ];
-            };
+            optTree = pkgs.linkFarm "ddk-root-${ver}" [
+              { name = "opt/ddk/clang/${spec.clang}"; path = "${tool}/clang/${spec.clang}"; }
+              { name = "opt/ddk/kdir/${ver}"; path = kdrv.kernel; }
+              { name = "opt/ddk/src/${ver}"; path = kdrv.source; }
+            ];
           in n2c.buildImage {
             name = "ddk:${ver}";
-            copyToRoot = rootWithTools;
+            copyToRoot = [
+              optTree
+              pkgs.bashInteractive
+              pkgs.coreutils
+              pkgs.gnumake
+              pkgs.findutils
+              pkgs.gnugrep
+              pkgs.gawk
+              pkgs.gzip
+              pkgs.xz
+              pkgs.util-linux
+              pkgs.dwarves # pahole
+            ];
             config = {
               Env = [
                 "DDK_ROOT=/opt/ddk"
