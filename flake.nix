@@ -267,6 +267,43 @@
       } // images // devImages
     );
 
+    # Apps: FHS build environment to run full host builds under /opt/ddk
+    apps = forAllSystems (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        lib = pkgs.lib;
+        # minimal toolkit for building via setup.sh inside FHS
+        fhsPkgs = [
+          pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gawk pkgs.gnumake
+          pkgs.git pkgs.curl pkgs.wget pkgs.xz pkgs.gzip pkgs.util-linux pkgs.which pkgs.perl pkgs.bc
+          pkgs.bison pkgs.flex pkgs.pkg-config pkgs.openssl pkgs.ncurses pkgs.dwarves pkgs.python3Full pkgs.gnutar
+        ];
+        # prefer DDK_ROOT to locate workspace; fall back to PWD
+        workdir = let d = builtins.getEnv "DDK_ROOT"; in if d != "" then d else builtins.getEnv "PWD";
+        fhs = pkgs.buildFHSUserEnvBubblewrap {
+          name = "ddk-fhs";
+          targetPkgs = (_: fhsPkgs);
+          extraMounts = lib.optionals (workdir != "") [ { source = workdir; target = "/opt/ddk"; recursive = true; } ];
+          profile = ''
+            export DDK_ROOT=/opt/ddk
+            cd /opt/ddk || true
+          '';
+          runScript = "${pkgs.bashInteractive}/bin/bash";
+        };
+        shellWrapper = pkgs.writeShellApplication {
+          name = "ddk-fhs-shell";
+          text = ''exec ${fhs}/bin/ddk-fhs'';
+        };
+        setupWrapper = pkgs.writeShellApplication {
+          name = "ddk-fhs-setup";
+          text = ''exec ${fhs}/bin/ddk-fhs -lc './setup.sh'"""'';
+        };
+      in {
+        fhs-shell = { type = "app"; program = "${shellWrapper}/bin/ddk-fhs-shell"; };
+        fhs-setup = { type = "app"; program = "${setupWrapper}/bin/ddk-fhs-setup"; };
+      }
+    );
+
     # Development shells
     devShells = forAllSystems (system:
       let
