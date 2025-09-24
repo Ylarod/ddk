@@ -30,13 +30,19 @@ to_attr = $(subst .,_,$(subst -,_,$(1)))
 .PHONY: help list matrix clangs pack pack-all clean-pack \
 	ci-shell ci-run build-base push-base \
 	build-ddk push-ddk build-dev push-dev build-all-ddk push-all-ddk \
+	build-clang push-clang build-all-clang push-all-clang \
+	build-clang-for push-clang-for \
+	build-kernel push-kernel build-all-kernel push-all-kernel \
 	pack-all
 
 help:
 	@echo "Available targets:"
 	@echo "  pack VER=android14-6.1 [FORCE=1]" 
 	@echo "  pack-all [FORCE=1]"
-	@echo "  build-*/push-* (base, ddk, dev)"
+	@echo "  build-*/push-* (base, ddk, dev, kernel, clang)"
+	@echo "  build-clang CLANG=clang-rXXXXXX"
+	@echo "  build-clang-for VER=android14-6.1 (derives CLANG from matrix)"
+	@echo "  build-kernel VER=android14-6.1"
 	@echo "  ci-shell, ci-run CMD=..."
 	@echo "  list (matrix overview)"
 
@@ -115,20 +121,24 @@ push-base:
 
 build-ddk:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build-ddk VER=<androidX-Y>"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
 	DDK_ROOT=$(ROOT) nix build --impure .#ddk.$(call to_attr,$(VER))
 
 push-ddk:
 	@if [ -z "$(VER)" ]; then echo "Usage: make push-ddk VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
 	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
 	DDK_ROOT=$(ROOT) nix run --impure .#ddk.$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-dev:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build-dev VER=<androidX-Y>"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
 	DDK_ROOT=$(ROOT) nix build --impure .#ddk-dev.$(call to_attr,$(VER))
 
 push-dev:
 	@if [ -z "$(VER)" ]; then echo "Usage: make push-dev VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
 	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
 	DDK_ROOT=$(ROOT) nix run --impure .#ddk-dev.$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-all-ddk:
@@ -139,4 +149,60 @@ build-all-ddk:
 push-all-ddk:
 	@for ver in $(VERSIONS); do \
 	  $(MAKE) push-ddk VER=$$ver DEST_CREDS="$(DEST_CREDS)" || exit $$?; \
+	done
+
+# -----------------------------------------------------------------------------
+# ddk/clang images (require local clang/<ver>)
+# -----------------------------------------------------------------------------
+
+build-clang:
+	@if [ -z "$(CLANG)" ]; then echo "Usage: make build-clang CLANG=clang-rXXXXXX"; exit 1; fi
+	DDK_ROOT=$(ROOT) nix build --impure .#ddk-clang.$(call to_attr,$(CLANG))
+
+push-clang:
+	@if [ -z "$(CLANG)" ]; then echo "Usage: make push-clang CLANG=clang-rXXXXXX DEST_CREDS=..."; exit 1; fi
+	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
+	DDK_ROOT=$(ROOT) nix run --impure .#ddk-clang.$(call to_attr,$(CLANG)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+
+build-clang-for:
+	@if [ -z "$(VER)" ]; then echo "Usage: make build-clang-for VER=<androidX-Y>"; exit 1; fi
+	$(MAKE) build-clang CLANG=$(call find-clang,$(VER))
+
+push-clang-for:
+	@if [ -z "$(VER)" ]; then echo "Usage: make push-clang-for VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
+	$(MAKE) push-clang CLANG=$(call find-clang,$(VER)) DEST_CREDS="$(DEST_CREDS)"
+
+build-all-clang:
+	@for c in $(sort $(CLANGS)); do \
+	  $(MAKE) build-clang CLANG=$$c || exit $$?; \
+	done
+
+push-all-clang:
+	@for c in $(sort $(CLANGS)); do \
+	  $(MAKE) push-clang CLANG=$$c DEST_CREDS="$(DEST_CREDS)" || exit $$?; \
+	done
+
+# -----------------------------------------------------------------------------
+# ddk/kernel images (require .pkg/src.$(VER).tar and .pkg/kdir.$(VER).tar)
+# -----------------------------------------------------------------------------
+
+build-kernel:
+	@if [ -z "$(VER)" ]; then echo "Usage: make build-kernel VER=<androidX-Y>"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
+	DDK_ROOT=$(ROOT) nix build --impure .#ddk-kernel.$(call to_attr,$(VER))
+
+push-kernel:
+	@if [ -z "$(VER)" ]; then echo "Usage: make push-kernel VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
+	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
+	$(MAKE) pack VER=$(VER) FORCE=$(FORCE)
+	DDK_ROOT=$(ROOT) nix run --impure .#ddk-kernel.$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+
+build-all-kernel:
+	@for ver in $(VERSIONS); do \
+	  $(MAKE) build-kernel VER=$$ver || exit $$?; \
+	done
+
+push-all-kernel:
+	@for ver in $(VERSIONS); do \
+	  $(MAKE) push-kernel VER=$$ver DEST_CREDS="$(DEST_CREDS)" || exit $$?; \
 	done
