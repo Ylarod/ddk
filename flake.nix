@@ -10,6 +10,11 @@
   outputs = { self, nixpkgs, nix2container, ... }:
   let
     forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" ];
+    resolveWorkspace =
+      let
+        ws = builtins.getEnv "DDK_ROOT";
+        pwd = builtins.getEnv "PWD";
+      in if ws != "" then ws else if pwd != "" then pwd else ".";
   in
   {
     packages = forAllSystems (system:
@@ -19,52 +24,41 @@
         n2c = (import nix2container { inherit pkgs system; }).nix2container;
 
         versions = import ./nix/versions.nix { inherit lib; };
+        # Resolve once per-system to avoid repeating in helpers
+        workspace = resolveWorkspace;
 
-        # Inline: mkToolchain and mkKernel
+        # ------------------------------------------------------------
+        # Inputs: local toolchain and kernel trees from workspace
+        # ------------------------------------------------------------
         mkToolchain = { version }:
           let
-            ws = builtins.getEnv "DDK_ROOT";
-            workspace = if ws != "" then ws else throw "DDK_ROOT not set. export DDK_ROOT=<path to repo>";
             localDirPath = "${workspace}/clang/${version}";
           in if builtins.pathExists localDirPath then
             let
               src = builtins.path { path = localDirPath; name = "clang-${version}"; };
             in pkgs.linkFarm "${version}-vendor" [
               { name = "clang/${version}"; path = src; }
-              { name = "bin"; path = src + "/bin"; }
             ]
           else
             throw "Missing local clang/${version}. Run: source ./envsetup.sh && setup_clang <branch> ${version}";
 
         mkKernel = { ver, srcRev, srcBranch, toolchain, lto ? null }:
           let
-            ws = builtins.getEnv "DDK_ROOT";
-            workspace = if ws != "" then ws else throw "DDK_ROOT not set. export DDK_ROOT=<path to repo>";
             pkgDir = "${workspace}/.pkg";
             srcTarPath = "${pkgDir}/src.${ver}.tar";
             kdirTarPath = "${pkgDir}/kdir.${ver}.tar";
 
-            srcDirPath = "${workspace}/src/${ver}";
-            kdirDirPath = "${workspace}/kdir/${ver}";
-
             haveSrcTar = builtins.pathExists srcTarPath;
             haveKdirTar = builtins.pathExists kdirTarPath;
-            haveSrcDir = builtins.pathExists srcDirPath;
-            haveKdirDir = builtins.pathExists kdirDirPath;
 
             srcTar = if haveSrcTar then builtins.path { path = srcTarPath; name = "src.${ver}.tar"; } else null;
             kdirTar = if haveKdirTar then builtins.path { path = kdirTarPath; name = "kdir.${ver}.tar"; } else null;
-            srcDirStore = if haveSrcDir then builtins.path { path = srcDirPath; name = "src-${ver}"; } else null;
-            kdirDirStore = if haveKdirDir then builtins.path { path = kdirDirPath; name = "kdir-${ver}"; } else null;
 
             script = if haveSrcTar && haveKdirTar then ''
                 tar -xf ${srcTar}  -C "$source" --strip-components=1
                 tar -xf ${kdirTar} -C "$kernel" --strip-components=1
-              '' else if haveSrcDir && haveKdirDir then ''
-                cp -a ${srcDirStore}/.  "$source/"
-                cp -a ${kdirDirStore}/. "$kernel/"
               '' else ''
-                echo "Missing prebuilt artifacts for ${ver}. Provide .pkg/src.${ver}.tar & kdir.${ver}.tar or ./src/${ver} & ./kdir/${ver}."
+                echo "Missing prebuilt artifacts for ${ver}. Require .pkg/src.${ver}.tar and .pkg/kdir.${ver}.tar"
                 exit 2
               '';
           in pkgs.runCommand "ddk-prebuilt-${ver}" {
@@ -77,7 +71,9 @@
             printf '%s\n' "${ver}" > "$out/version"
           '';
 
-        # Common base packages needed to build kernel modules (kept minimal)
+        # ------------------------------------------------------------
+        # Base layer and image
+        # ------------------------------------------------------------
         basePkgs = [
           pkgs.bashInteractive
           pkgs.coreutils
@@ -88,7 +84,7 @@
           pkgs.gzip
           pkgs.xz
           pkgs.util-linux
-          pkgs.pahole      # pahole
+          pkgs.pahole
           pkgs.git
           pkgs.curl
           pkgs.jq
@@ -100,19 +96,16 @@
           pkgs.openssl
           pkgs.ncurses
           pkgs.gnutar
-          pkgs.cacert        # CA bundle for TLS
+          pkgs.cacert
         ];
 
-        # Build a stable reusable base layer from Nix packages
         baseEnv = pkgs.buildEnv {
           name = "ddk-base-env";
           paths = basePkgs;
           ignoreCollisions = true;
           pathsToLink = [ "/bin" ];
         };
-        baseLayer = n2c.buildLayer {
-          copyToRoot = baseEnv;
-        };
+        baseLayer = n2c.buildLayer { copyToRoot = baseEnv; };
 
         baseImage = n2c.buildImage {
           name = "ghcr.io/ylarod/ddk-base";
@@ -135,36 +128,78 @@
           };
         };
 
-        # helper to build a DDK image for a given version key
-        mkImage = ver:
+        # ------------------------------------------------------------
+        # Layers and images: clang, kernel, ddk, ddk-dev
+        # ------------------------------------------------------------
+        mkClangLayer = clangVer:
+          let tool = mkToolchain { version = clangVer; };
+          in n2c.buildLayer {
+            copyToRoot = pkgs.linkFarm "ddk-clang-${clangVer}" [
+              { name = "opt/ddk/clang/${clangVer}"; path = "${tool}/clang/${clangVer}"; }
+            ];
+          };
+
+        mkKernelLayer = ver:
           let
             spec = versions.${ver};
             tool = mkToolchain { version = spec.clang; };
-            kdrv = mkKernel {
-              ver = ver;
-              srcRev = spec.srcRev;
-              srcBranch = spec.srcBranch;
-              toolchain = tool;
-              # lto = null; # optionally set: "none" | "thin" | "full"
-            };
-
-            # Layer 1: toolchain only (reused across images sharing same clang)
-            clangLayer = pkgs.linkFarm "ddk-clang-${spec.clang}" [
-              { name = "opt/ddk/clang/${spec.clang}"; path = "${tool}/clang/${spec.clang}"; }
-            ];
-            clangContentLayer = n2c.buildLayer { copyToRoot = clangLayer; };
-
-            # Layer 2: version-paired kdir + src (strongly bundled together)
-            verLayer = pkgs.linkFarm "ddk-tree-${ver}" [
+            kdrv = mkKernel { ver = ver; srcRev = spec.srcRev; srcBranch = spec.srcBranch; toolchain = tool; };
+          in n2c.buildLayer {
+            copyToRoot = pkgs.linkFarm "ddk-tree-${ver}" [
               { name = "opt/ddk/kdir/${ver}"; path = kdrv.kernel; }
               { name = "opt/ddk/src/${ver}"; path = kdrv.source; }
             ];
-            verContentLayer = n2c.buildLayer { copyToRoot = verLayer; };
+          };
+
+        # ddk/clang image: only /opt/ddk/clang/<ver>
+        mkClangImage = clangVer: n2c.buildImage {
+          name = "ghcr.io/ylarod/ddk/clang";
+          tag = clangVer;
+          layers = [ (mkClangLayer clangVer) ];
+          config = {
+            Env = [ "DDK_ROOT=/opt/ddk" ];
+            Cmd = [ "bash" ];
+            Labels = {
+              "org.opencontainers.image.title" = "ddk/clang ${clangVer}";
+              "org.opencontainers.image.description" = "Android kernel clang toolchain";
+              "io.ddk.project" = "ddk";
+              "io.ddk.clang.version" = clangVer;
+              "io.ddk.variant" = "clang";
+            };
+          };
+        };
+
+        # ddk/kernel image: only /opt/ddk/src/<ver> and /opt/ddk/kdir/<ver>
+        mkKernelImage = ver:
+          let spec = versions.${ver}; in
+          n2c.buildImage {
+            name = "ghcr.io/ylarod/ddk/kernel";
+            tag = ver;
+            layers = [ (mkKernelLayer ver) ];
+            config = {
+              Env = [ "DDK_ROOT=/opt/ddk" ];
+              Cmd = [ "bash" ];
+              Labels = {
+                "org.opencontainers.image.title" = "ddk/kernel ${ver}";
+                "org.opencontainers.image.description" = "Kernel src+kdir for ${ver}";
+                "io.ddk.project" = "ddk";
+                "io.ddk.android.version" = ver;
+                "io.ddk.clang.version" = spec.clang;
+                "io.ddk.variant" = "kernel";
+              };
+            };
+          };
+
+        # ddk image: composed from base + ddk/clang + ddk/kernel
+        mkDdkImage = ver:
+          let
+            spec = versions.${ver};
+            clangLayer = mkClangLayer spec.clang;
+            kernelLayer = mkKernelLayer ver;
           in n2c.buildImage {
             name = "ghcr.io/ylarod/ddk";
             tag = ver;
-            layers = [ baseLayer clangContentLayer verContentLayer ];
-            copyToRoot = [ ];
+            layers = [ baseLayer clangLayer kernelLayer ];
             config = {
               Env = [
                 "DDK_ROOT=/opt/ddk"
@@ -185,50 +220,25 @@
                 "io.ddk.project" = "ddk";
                 "io.ddk.android.version" = ver;
                 "io.ddk.clang.version" = spec.clang;
-                "io.ddk.kernel.src" = ver;
+                "io.ddk.variant" = "ddk";
               };
             };
           };
 
-        # Produce ddk images keyed by version; also provide normalized keys for CLI-friendly attrs
-        images = lib.mapAttrs (_: mkImage) versions;
-        norm = ver: lib.replaceStrings [ "-" "." ] [ "_" "_" ] ver;
-        ddkImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkImage ver; }) (lib.attrNames versions));
-
-        # Dev images: based on ddk (base + clang + src/kdir) plus Nix as package manager
+        # ddk-dev image: ddk + developer tools
         devTools = [ pkgs.nix pkgs.less pkgs.vim pkgs.python3Full pkgs.zip pkgs.unzip pkgs.wget ];
-        devEnv = pkgs.buildEnv {
-          name = "ddk-dev-env";
-          paths = devTools;
-          ignoreCollisions = true;
-          pathsToLink = [ "/bin" ];
-        };
+        devEnv = pkgs.buildEnv { name = "ddk-dev-env"; paths = devTools; ignoreCollisions = true; pathsToLink = [ "/bin" ]; };
+        devLayer = n2c.buildLayer { copyToRoot = devEnv; };
+
         mkDevImage = ver:
           let
             spec = versions.${ver};
-            tool = mkToolchain { version = spec.clang; };
-            kdrv = mkKernel {
-              ver = ver;
-              srcRev = spec.srcRev;
-              srcBranch = spec.srcBranch;
-              toolchain = tool;
-            };
-            verLayer = pkgs.linkFarm "ddk-tree-${ver}" [
-              { name = "opt/ddk/kdir/${ver}"; path = kdrv.kernel; }
-              { name = "opt/ddk/src/${ver}"; path = kdrv.source; }
-            ];
-            clangLayer = pkgs.linkFarm "ddk-clang-${spec.clang}" [
-              { name = "opt/ddk/clang/${spec.clang}"; path = "${tool}/clang/${spec.clang}"; }
-            ];
-            clangContentLayer = n2c.buildLayer { copyToRoot = clangLayer; };
-            verContentLayer = n2c.buildLayer { copyToRoot = verLayer; };
-            devContentLayer = n2c.buildLayer { copyToRoot = devEnv; };
+            clangLayer = mkClangLayer spec.clang;
+            kernelLayer = mkKernelLayer ver;
           in n2c.buildImage {
             name = "ghcr.io/ylarod/ddk-dev";
             tag = ver;
-            # Layered exactly as: ddk + dev tools
-            layers = [ baseLayer clangContentLayer verContentLayer devContentLayer ];
-            copyToRoot = [ ];
+            layers = [ baseLayer clangLayer kernelLayer devLayer ];
             initializeNixDatabase = true;
             config = {
               Env = [
@@ -255,53 +265,36 @@
               };
             };
           };
-        devImages = lib.mapAttrs (_: mkDevImage) versions;
+
+        # ------------------------------------------------------------
+        # Exported images
+        # ------------------------------------------------------------
+        norm = s: lib.replaceStrings [ "-" "." "/" ] [ "_" "_" "_" ] s;
+
+        # ddk (per version) for compatibility: top-level attr by version name
+        ddkByVer = lib.mapAttrs (_: mkDdkImage) versions;
+
+        # Namespaced attribute sets for clarity in CLI usage
+        ddkImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDdkImage ver; }) (lib.attrNames versions));
         ddkDevImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDevImage ver; }) (lib.attrNames versions));
+        ddkKernelImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkKernelImage ver; }) (lib.attrNames versions));
+
+        # Unique clang versions across all entries
+        clangVersions = lib.unique (map (spec: spec.clang) (lib.attrValues versions));
+        ddkClangImages = lib.listToAttrs (map (cv: { name = norm cv; value = mkClangImage cv; }) clangVersions);
       in
       {
+        # Base image
         ddk-base = baseImage;
-        # friendly attribute paths: .#ddk.<normalized ver> and .#ddk-dev.<normalized ver>
-        ddk = ddkImages;
-        ddk-dev = ddkDevImages;
-        # retain old direct keys for compatibility (require quotes due to dots)
-      } // images // devImages
-    );
 
-    # Apps: FHS build environment to run full host builds under /opt/ddk
-    apps = forAllSystems (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-        lib = pkgs.lib;
-        # minimal toolkit for building via setup.sh inside FHS
-        fhsPkgs = [
-          pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gawk pkgs.gnumake
-          pkgs.git pkgs.curl pkgs.wget pkgs.xz pkgs.gzip pkgs.util-linux pkgs.which pkgs.perl pkgs.bc
-          pkgs.bison pkgs.flex pkgs.pkg-config pkgs.openssl pkgs.ncurses pkgs.dwarves pkgs.python3Full pkgs.gnutar
-        ];
-        # prefer DDK_ROOT to locate workspace; fall back to PWD
-        workdir = let d = builtins.getEnv "DDK_ROOT"; in if d != "" then d else builtins.getEnv "PWD";
-        fhs = pkgs.buildFHSUserEnvBubblewrap {
-          name = "ddk-fhs";
-          targetPkgs = (_: fhsPkgs);
-          extraMounts = lib.optionals (workdir != "") [ { source = workdir; target = "/opt/ddk"; recursive = true; } ];
-          profile = ''
-            export DDK_ROOT=/opt/ddk
-            cd /opt/ddk || true
-          '';
-          runScript = "${pkgs.bashInteractive}/bin/bash";
-        };
-        shellWrapper = pkgs.writeShellApplication {
-          name = "ddk-fhs-shell";
-          text = ''exec ${fhs}/bin/ddk-fhs'';
-        };
-        setupWrapper = pkgs.writeShellApplication {
-          name = "ddk-fhs-setup";
-          text = ''exec ${fhs}/bin/ddk-fhs -lc './setup.sh'"""'';
-        };
-      in {
-        fhs-shell = { type = "app"; program = "${shellWrapper}/bin/ddk-fhs-shell"; };
-        fhs-setup = { type = "app"; program = "${setupWrapper}/bin/ddk-fhs-setup"; };
-      }
+        # Friendly grouping
+        ddk = ddkImages;          # .#ddk.<ver>
+        ddk-dev = ddkDevImages;   # .#ddk-dev.<ver>
+        ddk-kernel = ddkKernelImages; # .#ddk-kernel.<ver>
+        ddk-clang = ddkClangImages;   # .#ddk-clang.<clang>
+
+        # Back-compat: expose ddk images at top-level by version name (no dev override)
+      } // ddkByVer
     );
 
     # Development shells
