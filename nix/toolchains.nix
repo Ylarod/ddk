@@ -6,11 +6,11 @@
 let
   # Unified metadata per toolchain
   metadata = {
-    "clang-r416183b" = { branch = "master-kernel-build-2021"; sha256 = "sha256-aYvEWU1gt++qu8m4W4vuRjAvMmIg2p2FslnD+44jLgo="; };
-    "clang-r450784e" = { branch = "master-kernel-build-2022"; sha256 = "sha256-EsgydAK2kVP8V068nsjAEzUT37aEto/H41YjlHydAOM="; };
-    "clang-r487747c" = { branch = "main-kernel-build-2023";  sha256 = "sha256-MqN/Ybuxh5WCZKFUnuNPjYAV9AP/wr0kd7Xeeen/ddk="; };
-    "clang-r510928"  = { branch = "main-kernel-build-2024";  sha256 = "sha256-Z7YgUK6XiqqrE8hp7JZnmZGWXaXmIlJGLQQvbwHBpGc="; };
-    "clang-r536225"  = { branch = "main-kernel-2025";       sha256 = "sha256-HulH36XS922nar0xYP0CEHiAatdeWYmz0E4uJjX2N2c="; };
+    "clang-r416183b" = { branch = "master-kernel-build-2021"; sha256 = "sha256-05pr6i8kxq6fxdn5sh6rlr89hq8vxv2n60rw6kyn9cvs2iavkmx3"; };
+    "clang-r450784e" = { branch = "master-kernel-build-2022"; sha256 = "sha256-1qzisykwyabfcanvgmfvrgh3mybq6j3i9pw5xg70f75i4db2rz1i"; };
+    "clang-r487747c" = { branch = "main-kernel-build-2023";  sha256 = "sha256-1bxlvc6aplrn6lk7ir3wammkbqac3nf5gcx1h0v1cwjybhng0va6"; };
+    "clang-r510928"  = { branch = "main-kernel-build-2024";  sha256 = "sha256-195ngpbvf8hvq1y1dwna3zjdmkz31mky0y0rdry2k7r4h5yv429j"; };
+    "clang-r536225"  = { branch = "main-kernel-2025";       sha256 = "sha256-1xjzy84a459plvrm5aw3l7zy7qxm77d2nfxagfm0i0vz19bm4rmg"; };
   };
 in
 { version
