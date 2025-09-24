@@ -29,13 +29,12 @@ let
                  else if meta ? sha256 then meta.sha256 else null;
 in
 if haveLocalDir then
-  pkgs.runCommand "${version}-vendor" {
-    preferLocalBuild = true;
-    allowSubstitutes = false;
-  } ''
-    mkdir -p "$out/clang/${version}"
-    cp -a ${localDir}/. "$out/clang/${version}/"
-  ''
+  let
+    # Import the local directory into the Nix store once, then reference it via symlink.
+    src = builtins.path { path = localDir; name = "clang-${version}"; };
+  in pkgs.linkFarm "${version}-vendor" [
+    { name = "clang/${version}"; path = src; }
+  ]
 else
   let
     url = "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/${effectiveBranch}/${version}.tar.gz";
@@ -44,7 +43,6 @@ else
       inherit url;
       sha256 = if effectiveSha != null then effectiveSha else (throw "Missing sha256 for ${version}; vendor ../clang/${version} or pass sha256s");
     };
-  in pkgs.runCommand "${version}-fetched" {} ''
-    mkdir -p "$out/clang"
-    ln -s ${src} "$out/clang/${version}"
-  ''
+  in pkgs.linkFarm "${version}-fetched" [
+    { name = "clang/${version}"; path = src; }
+  ]
