@@ -1,6 +1,8 @@
 # .ide/Dockerfile
 FROM cnbcool/default-dev-env:latest
 
+RUN apt-get install -y xz-utils
+
 # Install Nix
 RUN sh <(curl -L https://nixos.org/nix/install) --no-daemon
 
