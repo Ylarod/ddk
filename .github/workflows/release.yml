@@ -44,7 +44,7 @@ jobs:
       - name: Build ddk images (ddk and ddk-dev)
         run: |
           nix build .#${{ matrix.source_name }}
-          nix build .#ddk-dev.$(echo "${{ matrix.source_name }}" | tr '-.' '__')
+          nix build .#ddk_dev_$(echo "${{ matrix.source_name }}" | tr '-.' '__')
 
       - name: Push to GHCR (optional)
         if: ${{ secrets.GHCR_TOKEN != '' }}
@@ -52,4 +52,4 @@ jobs:
           DEST_CREDS: ${{ github.actor }}:${{ secrets.GHCR_TOKEN }}
         run: |
           nix run .#${{ matrix.source_name }}.copyToRegistry -- --dest-creds "${DEST_CREDS}"
-          nix run .#ddk-dev.$(echo "${{ matrix.source_name }}" | tr '-.' '__').copyToRegistry -- --dest-creds "${DEST_CREDS}"
+          nix run .#ddk_dev_$(echo "${{ matrix.source_name }}" | tr '-.' '__').copyToRegistry -- --dest-creds "${DEST_CREDS}"

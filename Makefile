@@ -19,7 +19,7 @@ CLANGS   := $(foreach pair,$(MATRIX),$(word 2,$(subst :, ,$(pair))))
 
 # GHCR registry options
 REG ?= ghcr.io/ylarod
-DEST_CREDS ?=
+DEST_CREDS ?= $(shell cat ~/.docker/config.json | jq -r '.auths["ghcr.io"].auth' | base64 -d)
 
 # Utility to map VER->CLANG
 find-clang = $(shell echo $(MATRIX) | tr ' ' '\n' | awk -F: '$$1=="$(1)" {print $$2}')
@@ -69,29 +69,29 @@ ci-run:
 # -----------------------------------------------------------------------------
 
 build-base:
-	DDK_ROOT=$(ROOT) nix build --impure .#ddk-base
+	nix build .#ddk-base
 
 push-base:
 	@if [ -z "$(DEST_CREDS)" ]; then echo "Usage: make push-base DEST_CREDS=\"user:token\""; exit 1; fi
-	DDK_ROOT=$(ROOT) nix run --impure .#ddk-base.copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+	nix run .#ddk-base.copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-ddk:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build-ddk VER=<androidX-Y>"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix build --impure .#ddk.$(call to_attr,$(VER))
+	nix build .#ddk_$(call to_attr,$(VER))
 
 push-ddk:
 	@if [ -z "$(VER)" ]; then echo "Usage: make push-ddk VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
 	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix run --impure .#ddk.$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+	nix run .#ddk_$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-dev:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build-dev VER=<androidX-Y>"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix build --impure .#ddk-dev.$(call to_attr,$(VER))
+	nix build .#ddk_dev_$(call to_attr,$(VER))
 
 push-dev:
 	@if [ -z "$(VER)" ]; then echo "Usage: make push-dev VER=<androidX-Y> DEST_CREDS=..."; exit 1; fi
 	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix run --impure .#ddk-dev.$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+	nix run .#ddk_dev_$(call to_attr,$(VER)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-all-ddk:
 	@for ver in $(VERSIONS); do \
@@ -109,12 +109,12 @@ push-all-ddk:
 
 build-clang:
 	@if [ -z "$(CLANG)" ]; then echo "Usage: make build-clang CLANG=clang-rXXXXXX"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix build --impure .#ddk-clang.$(call to_attr,$(CLANG))
+	nix build .#ddk_clang_$(call to_attr,$(CLANG))
 
 push-clang:
 	@if [ -z "$(CLANG)" ]; then echo "Usage: make push-clang CLANG=clang-rXXXXXX DEST_CREDS=..."; exit 1; fi
 	@if [ -z "$(DEST_CREDS)" ]; then echo "DEST_CREDS required"; exit 1; fi
-	DDK_ROOT=$(ROOT) nix run --impure .#ddk-clang.$(call to_attr,$(CLANG)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
+	nix run .#ddk_clang_$(call to_attr,$(CLANG)).copyToRegistry -- --dest-creds "$(DEST_CREDS)"
 
 build-clang-for:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build-clang-for VER=<androidX-Y>"; exit 1; fi

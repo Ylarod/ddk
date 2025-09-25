@@ -9,17 +9,27 @@
 , srcRev
 , srcBranch
 , toolchain
+, srcSha256 ? null
 , lto ? null # one of null (default defconfig), "none", "thin", "full"
 }:
 
 let
   # Always fetch kernel sources from AOSP to avoid local workspace dependency.
-  # Use builtins.fetchGit to avoid requiring a fixed-output hash.
-  srcDrv = builtins.fetchGit {
-    url = "https://android.googlesource.com/kernel/common";
-    rev = srcRev;
-    submodules = false;
-  };
+  # Prefer fixed-output fetch (pkgs.fetchgit) when sha256 is provided for better caching/logging.
+  srcDrv = if srcSha256 != null then
+    pkgs.fetchgit {
+      url = "https://android.googlesource.com/kernel/common";
+      rev = srcRev;
+      sha256 = srcSha256;
+      fetchSubmodules = false;
+      leaveDotGit = false;
+    }
+  else
+    builtins.fetchGit {
+      url = "https://android.googlesource.com/kernel/common";
+      rev = srcRev;
+      submodules = false;
+    };
 in
 pkgs.stdenv.mkDerivation {
   pname = "ddk-kernel-${ver}";

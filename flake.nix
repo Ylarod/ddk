@@ -4,7 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nix2container.url = "github:nlewo/nix2container";
-    nix2container.flake = false; # treat as source tree to import lib
   };
 
   outputs = { self, nixpkgs, nix2container, ... }:
@@ -29,12 +28,13 @@
         # ------------------------------------------------------------
         mkToolchain = { version }: toolchainFor { inherit version; };
 
-        mkKernel = { ver, srcRev, srcBranch, toolchain, lto ? null }:
-          kernelBuild { inherit ver srcRev srcBranch lto; toolchain = toolchain; };
+        mkKernel = { ver, srcRev, srcBranch, toolchain, srcSha256 ? null, lto ? null }:
+          kernelBuild { inherit ver srcRev srcBranch lto srcSha256; toolchain = toolchain; };
 
         # ------------------------------------------------------------
         # Base layer and image
         # ------------------------------------------------------------
+        # Keep base minimal: only essentials to build kernel modules
         basePkgs = [
           pkgs.bashInteractive
           pkgs.coreutils
@@ -42,13 +42,7 @@
           pkgs.gnugrep
           pkgs.gawk
           pkgs.gnumake
-          pkgs.gzip
-          pkgs.xz
-          pkgs.util-linux
           pkgs.pahole
-          pkgs.git
-          pkgs.curl
-          pkgs.jq
           pkgs.perl
           pkgs.bc
           pkgs.bison
@@ -56,7 +50,6 @@
           pkgs.pkg-config
           pkgs.openssl
           pkgs.ncurses
-          pkgs.gnutar
           pkgs.cacert
         ];
 
@@ -108,6 +101,7 @@
               ver = ver;
               srcRev = spec.srcRev;
               srcBranch = spec.srcBranch;
+              srcSha256 = spec.srcSha256 or null;
               toolchain = "${tool}/clang/${spec.clang}";
             };
           in n2c.buildLayer {
@@ -171,7 +165,10 @@
           };
 
         # ddk-dev image: ddk + developer tools
-        devTools = [ pkgs.nix pkgs.less pkgs.vim pkgs.python3Full pkgs.zip pkgs.unzip pkgs.wget ];
+        devTools = [
+          pkgs.nix pkgs.less pkgs.vim pkgs.python3Full pkgs.zip pkgs.unzip pkgs.wget
+          pkgs.git pkgs.curl pkgs.jq pkgs.gnutar pkgs.gzip pkgs.xz pkgs.util-linux
+        ];
         devEnv = pkgs.buildEnv { name = "ddk-dev-env"; paths = devTools; ignoreCollisions = true; pathsToLink = [ "/bin" ]; };
         devLayer = n2c.buildLayer { copyToRoot = devEnv; };
 
@@ -184,7 +181,7 @@
             name = "ghcr.io/ylarod/ddk-dev";
             tag = ver;
             layers = [ baseLayer clangLayer kernelLayer devLayer ];
-            initializeNixDatabase = true;
+            # initializeNixDatabase = true;
             config = {
               Env = [
                 "DDK_ROOT=/opt/ddk"
@@ -217,27 +214,38 @@
         norm = s: lib.replaceStrings [ "-" "." "/" ] [ "_" "_" "_" ] s;
 
         # ddk (per version) for compatibility: top-level attr by version name
-        ddkByVer = lib.mapAttrs (_: mkDdkImage) versions;
-
-        # Namespaced attribute sets for clarity in CLI usage
-        ddkImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDdkImage ver; }) (lib.attrNames versions));
-        ddkDevImages = lib.listToAttrs (map (ver: { name = norm ver; value = mkDevImage ver; }) (lib.attrNames versions));
+        # Map attribute name (version string) to image; ignore the spec value
+        ddkByVer = lib.mapAttrs (ver: _: mkDdkImage ver) versions;
 
         # Unique clang versions across all entries
         clangVersions = lib.unique (map (spec: spec.clang) (lib.attrValues versions));
-        ddkClangImages = lib.listToAttrs (map (cv: { name = norm cv; value = mkClangImage cv; }) clangVersions);
+
+        # Flattened, CLI-friendly names (avoid nested sets under packages)
+        ddkFlat = lib.listToAttrs (map (ver: { name = "ddk_" + (norm ver); value = mkDdkImage ver; }) (lib.attrNames versions));
+        ddkDevFlat = lib.listToAttrs (map (ver: { name = "ddk_dev_" + (norm ver); value = mkDevImage ver; }) (lib.attrNames versions));
+        ddkClangFlat = lib.listToAttrs (map (cv: { name = "ddk_clang_" + (norm cv); value = mkClangImage cv; }) clangVersions);
       in
       {
         # Base image
         ddk-base = baseImage;
 
-        # Friendly grouping
-        ddk = ddkImages;          # .#ddk.<ver>
-        ddk-dev = ddkDevImages;   # .#ddk-dev.<ver>
-        ddk-clang = ddkClangImages;   # .#ddk-clang.<clang>
-
-        # Back-compat: expose ddk images at top-level by version name (no dev override)
-      } // ddkByVer
+        # Flattened names, e.g. .#ddk_android14_6_1, .#ddk_dev_android14_6_1, .#ddk_clang_clang_r487747c
+      } // ddkFlat // ddkDevFlat // ddkClangFlat // ddkByVer
+      // (
+        let
+          # Debug helpers to narrow failures
+          mkToolDbg = ver: mkToolchain { version = ver; };
+          mkSrcDbg = ver:
+            let spec = versions.${ver}; in
+            (kernelBuild {
+              ver = ver; srcRev = spec.srcRev; srcBranch = spec.srcBranch;
+              srcSha256 = spec.srcSha256 or null; toolchain = baseEnv; # dummy path, we only need to fetch/patch src
+            }).source;
+        in {
+          ddk_debug_toolchain_clang_r416183b = mkToolDbg "clang-r416183b";
+          ddk_debug_src_android12_5_10 = mkSrcDbg "android12-5.10";
+        }
+      )
     );
 
     # Development shells
