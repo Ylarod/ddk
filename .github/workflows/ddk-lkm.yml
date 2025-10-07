@@ -1,0 +1,70 @@
+name: DDK Build Kernel Module
+
+on:
+  workflow_call:
+    inputs:
+      kmi:
+        description: 'KMI version'
+        required: true
+        type: string
+      ddk_release:
+        description: 'DDK release version'
+        required: false
+        default: '20251007'
+        type: string
+      module_name:
+        description: 'Kernel module name (without .ko extension)'
+        required: false
+        default: 'android-wuwa'
+        type: string
+      module_path:
+        description: 'Path to the kernel module source code (Makefile should be present here)'
+        required: false
+        default: '.'
+        type: string
+
+jobs:
+  build-module:
+    name: Build ${{ inputs.module_name }}.ko for ${{ inputs.kmi }}
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ylarod/ddk:${{ inputs.kmi }}-${{ inputs.ddk_release }}
+      options: --privileged
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
+
+    - name: Build ${{ inputs.module_name }}.ko
+      run: |
+        echo "=== Building ${{ inputs.module_name }}.ko for KMI: ${{ inputs.kmi }} ==="
+
+        cd ${{ inputs.module_path }}
+
+        ls -al
+
+        make KDIR=$KERNEL_SRC
+        
+        echo "=== Build completed ==="
+
+        # Create output directory in GitHub workspace
+        mkdir -p /github/workspace/out
+        
+        # Copy with KMI-specific naming
+        OUTPUT_NAME="${{ inputs.module_name }}-${{ inputs.kmi }}"
+        cp "${{ inputs.module_name }}.ko" "/github/workspace/out/$.ko"
+
+        echo "Copied to: /github/workspace/out/$OUTPUT_NAME.ko"
+        ls -la "/github/workspace/out/"
+        echo "Size: $(du -h "/github/workspace/out/$OUTPUT_NAME.ko" | cut -f1)"
+        cp "/github/workspace/out/$OUTPUT_NAME.ko" "/github/workspace/out/$OUTPUT_NAME.stripped.ko"
+        llvm-strip -d "/github/workspace/out/$OUTPUT_NAME.stripped.ko"
+        echo "Size after stripping: $(du -h "/github/workspace/out/$OUTPUT_NAME.stripped.ko" | cut -f1)"
+
+    - name: Upload ${{ inputs.module_name }}.ko artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.module_name }}-${{ inputs.kmi }}.ko
+        path: |
+          /github/workspace/out/${{ inputs.module_name }}-${{ inputs.kmi }}.ko
+          /github/workspace/out/${{ inputs.module_name }}-${{ inputs.kmi }}.stripped.ko
