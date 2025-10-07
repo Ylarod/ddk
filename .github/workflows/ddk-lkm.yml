@@ -47,12 +47,14 @@ jobs:
         
         echo "=== Build completed ==="
 
+        ls -al
+
         # Create output directory in GitHub workspace
         mkdir -p /github/workspace/out
         
         # Copy with KMI-specific naming
         OUTPUT_NAME="${{ inputs.module_name }}-${{ inputs.kmi }}"
-        cp "${{ inputs.module_name }}.ko" "/github/workspace/out/$.ko"
+        cp "${{ inputs.module_name }}.ko" "/github/workspace/out/$OUTPUT_NAME.ko"
 
         echo "Copied to: /github/workspace/out/$OUTPUT_NAME.ko"
         ls -la "/github/workspace/out/"
