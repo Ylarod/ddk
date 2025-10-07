@@ -37,7 +37,8 @@ main:
       runner:
         cpus: 64
       docker:
-        build: .cnb/Dockerfile
+        image:
+          name: ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-builder:latest
       git:
         enable: true
       stages:
@@ -51,7 +52,6 @@ main:
             df -h
             pwd
             ls -al
-            mkdir -p /opt/ddk
             rsync -av --exclude .git ./ /opt/ddk/
             ls -al /opt/ddk
         
@@ -64,6 +64,7 @@ main:
                 source ./envsetup.sh
                 setup_source android12-5.10 android12-5.10-2025-09_r1
                 pushd src/android12-5.10
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r416183b android12-5.10
@@ -77,6 +78,7 @@ main:
                 source ./envsetup.sh
                 setup_source android13-5.10 android13-5.10-2025-07_r1
                 pushd src/android13-5.10
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r450784e android13-5.10
@@ -90,6 +92,7 @@ main:
                 source ./envsetup.sh
                 setup_source android13-5.15 android13-5.15-2025-09_r2
                 pushd src/android13-5.15
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r450784e android13-5.15
@@ -103,6 +106,7 @@ main:
                 source ./envsetup.sh
                 setup_source android14-5.15 android14-5.15-2025-07_r1
                 pushd src/android14-5.15
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r487747c android14-5.15
@@ -116,6 +120,7 @@ main:
                 source ./envsetup.sh
                 setup_source android14-6.1 android14-6.1-2025-09_r4
                 pushd src/android14-6.1
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r487747c android14-6.1
@@ -129,6 +134,7 @@ main:
                 source ./envsetup.sh
                 setup_source android15-6.6 android15-6.6-2025-09_r5
                 pushd src/android15-6.6
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r510928 android15-6.6
@@ -142,6 +148,7 @@ main:
                 source ./envsetup.sh
                 setup_source android16-6.12 android16-6.12-2025-09_r2
                 pushd src/android16-6.12
+                rm -rf .git
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 popd
                 BUILD_PROC=9 build_kernel clang-r536225 android16-6.12
