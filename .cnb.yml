@@ -38,50 +38,17 @@ main:
             rsync -av --exclude .git ./ /opt/ddk/
             ls -al /opt/ddk
         
-        - name: clang setup
-          jobs:
-            clang-r416183b:
-              script: |
-                set -eux
-                cd /opt/ddk
-                . ./envsetup.sh
-                setup_clang master-kernel-build-2021 clang-r416183b
-            clang-r450784e:
-              script: |
-                set -eux
-                cd /opt/ddk
-                . ./envsetup.sh
-                setup_clang master-kernel-build-2022 clang-r450784e
-            clang-r487747c:
-              script: |
-                set -eux
-                cd /opt/ddk
-                . ./envsetup.sh
-                setup_clang main-kernel-build-2023 clang-r487747c
-            clang-r510928:
-              script: |
-                set -eux
-                cd /opt/ddk
-                . ./envsetup.sh
-                setup_clang main-kernel-build-2024 clang-r510928
-            clang-r536225:
-              script: |
-                set -eux
-                cd /opt/ddk
-                . ./envsetup.sh
-                setup_clang main-kernel-2025 clang-r536225
-        
         - name: build
           jobs:
             android12-5.10:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android12-5.10 android12-5.10-2025-09_r1
-                cd src/android12-5.10
+                pushd src/android12-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r416183b android12-5.10
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android12-5.10.tar.zst" android12-5.10
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android12-5.10.tar.zst" android12-5.10
@@ -90,11 +57,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android13-5.10 android13-5.10-2025-07_r1
-                cd src/android13-5.10
+                pushd src/android13-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r450784e android13-5.10
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android13-5.10.tar.zst" android13-5.10
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android13-5.10.tar.zst" android13-5.10
@@ -103,11 +70,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android13-5.15 android13-5.15-2025-09_r2
-                cd src/android13-5.15
+                pushd src/android13-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r450784e android13-5.15
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android13-5.15.tar.zst" android13-5.15
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android13-5.15.tar.zst" android13-5.15
@@ -116,11 +83,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android14-5.15 android14-5.15-2025-07_r1
-                cd src/android14-5.15
+                pushd src/android14-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r487747c android14-5.15
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android14-5.15.tar.zst" android14-5.15
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android14-5.15.tar.zst" android14-5.15
@@ -129,11 +96,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android14-6.1 android14-6.1-2025-09_r4
-                cd src/android14-6.1
+                pushd src/android14-6.1
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r487747c android14-6.1
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android14-6.1.tar.zst" android14-6.1
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android14-6.1.tar.zst" android14-6.1
@@ -142,11 +109,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android15-6.6 android15-6.6-2025-09_r5
-                cd src/android15-6.6
+                pushd src/android15-6.6
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r510928 android15-6.6
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android15-6.6.tar.zst" android15-6.6
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android15-6.6.tar.zst" android15-6.6
@@ -155,11 +122,11 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                . ./envsetup.sh
+                source ./envsetup.sh
                 setup_source android16-6.12 android16-6.12-2025-09_r2
-                cd src/android16-6.12
+                pushd src/android16-6.12
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-                cd - >/dev/null
+                popd
                 BUILD_PROC=9 build_kernel clang-r536225 android16-6.12
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android16-6.12.tar.zst" android16-6.12
                 tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android16-6.12.tar.zst" android16-6.12
