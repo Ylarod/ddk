@@ -4,104 +4,84 @@ on:
   workflow_dispatch:
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Generate matrix from mapping.json
+        id: gen
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('mapping.json', 'utf8');
+            const data = JSON.parse(raw);
+            const matrix = (data.matrix || []).map(m => ({
+              source_name: m.android,
+              clang_name: m.clang,
+            }));
+            core.setOutput('matrix', JSON.stringify(matrix));
+  
+  toolchains:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+    - name: Maximize build space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+          lfs: false
+
+    - name: Pull lfs
+      run: |
+        git lfs pull --include="clang/"
+        ls -al clang/
+
+    - name: Build image
+      run: |
+        cd docker
+        make toolchains PUSH=1
+  
   build:
+    needs: ["prepare", "toolchains"]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - source_name: "android12-5.10"
-            clang_name: "clang-r416183b"
-            clang_branch_name: "master-kernel-build-2021"
-          - source_name: "android13-5.10"
-            clang_name: "clang-r450784e"
-            clang_branch_name: "master-kernel-build-2022"
-          - source_name: "android13-5.15"
-            clang_name: "clang-r450784e"
-            clang_branch_name: "master-kernel-build-2022"
-          - source_name: "android14-5.15"
-            clang_name: "clang-r487747c"
-            clang_branch_name: "main-kernel-build-2023"
-          - source_name: "android14-6.1"
-            clang_name: "clang-r487747c"
-            clang_branch_name: "main-kernel-build-2023"
-          - source_name: "android15-6.6"
-            clang_name: "clang-r510928"
-            clang_branch_name: "main-kernel-build-2024"
-          - source_name: "android16-6.12"
-            clang_name: "clang-r536225"
-            clang_branch_name: "main-kernel-2025"
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     steps:
     - name: Maximize build space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 8192
-        temp-reserve-mb: 2048
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
 
     - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up environment
-      uses: awalsh128/cache-apt-pkgs-action@latest
+      uses: actions/checkout@v4
       with:
-        packages: pahole zstd binutils git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libx11-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python3 libelf-dev binutils-aarch64-linux-gnu gcc gzip
-        version: 1.0
-    
-    - name: Setup Clang
+          lfs: false
+
+    - name: Pull lfs
       run: |
-        source ./envsetup.sh
-        setup_clang ${{ matrix.clang_branch_name }} ${{ matrix.clang_name }}
+        git lfs pull --include="src/src.${{ matrix.source_name }}.tar.zst"
+        git lfs pull --include="kdir/kdir.${{ matrix.source_name }}.tar.zst"
+        ls -al src/
+        ls -al kdir/
 
-    - name: Setup Kernel Source
+    - name: Build image
       run: |
-        source ./envsetup.sh
-        setup_source ${{ matrix.source_name }}
-
-    - name: Patch Kernel
-      run: |
-        echo "[+] Patch kernel"
-        set -x
-        for dir in src/*; do
-          pushd $dir
-          sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-          popd
-        done
-        set +x
-
-    - name: Build Kernel
-      run: |
-        source ./envsetup.sh
-        LTO=thin build_kernel ${{ matrix.clang_name }} ${{ matrix.source_name }}
-
-    - name: Build Docker Image
-      run: |
-        tag="${{ matrix.source_name }}"
-        docker build -f dockerfiles/Dockerfile.${{ matrix.source_name }} -t ddk:$tag .
-        docker save ddk:$tag | zstd > docker-ddk-$tag.tar.zst
-        sha256sum docker-ddk-$tag.tar.zst > docker-ddk-$tag.tar.zst.sha256
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-ddk-${{ matrix.source_name }}
-        path: docker-ddk-*
-
-  release:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-
-    - name: Display structure of downloaded files
-      run: ls -R
-
-    - name: release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          docker-ddk-*
+        cd docker
+        make build VER=${{ matrix.source_name }} PUSH=1
