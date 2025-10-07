@@ -3,13 +3,17 @@ name: Build
 on:
   push:
     branches:
-      - master
+      - main
+    paths:
+      - 'module_template/**'
+      - '.github/workflows/module.yml'
+      - '.github/workflows/ddk-lkm.yml'
   pull_request:
 
 jobs:
   build-modules:
     name: Build Shami.ko
-    uses: .github/workflows/ddk-lkm.yml
+    uses: ./.github/workflows/ddk-lkm.yml
     strategy:
       fail-fast: false
       matrix:
