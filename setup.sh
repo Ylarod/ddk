@@ -27,13 +27,13 @@ setup_clang main-kernel-build-2024 clang-r510928
 setup_clang main-kernel-2025 clang-r536225
 
 echo "[+] Setup kernel source"
-setup_source android12-5.10
-setup_source android13-5.10
-setup_source android13-5.15
-setup_source android14-5.15
-setup_source android14-6.1
-setup_source android15-6.6
-setup_source android16-6.12
+setup_source android12-5.10 android12-5.10-2025-09_r1
+setup_source android13-5.10 android13-5.10-2025-07_r1
+setup_source android13-5.15 android13-5.15-2025-09_r2
+setup_source android14-5.15 android14-5.15-2025-07_r1
+setup_source android14-6.1 android14-6.1-2025-09_r4
+setup_source android15-6.6 android15-6.6-2025-09_r5
+setup_source android16-6.12 android16-6.12-2025-09_r2
 
 echo "[+] Patch kernel"
 set -x

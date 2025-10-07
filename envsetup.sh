@@ -18,13 +18,17 @@ function setup_clang()
 
 function setup_source()
 {
-    local branch=$1
-    if [ -d src/$branch ]; then
-        echo "[!] $branch already exists, skip"
+    local name=$1
+    local branch=$2
+    if [ -z "$branch" ]; then
+        branch="$name"
+    fi
+    if [ -d src/$name ]; then
+        echo "[!] $name already exists, skip"
         return
     fi
-    echo "[+] Clone $branch"
-    git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 src/$branch
+    echo "[+] Clone $name (branch: $branch)"
+    git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 src/$name
 }
 
 function build_kernel()
