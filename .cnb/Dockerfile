@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs wget curl ca-certificates tar xz-utils \
-    build-essential bc bison flex \
+    build-essential bc bison flex python3 clang lld \
     libelf-dev libssl-dev libdw-dev \
     dwarves rsync python3 \
     lz4 zstd libncurses-dev bash jq \
@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 RUN ln -sf /bin/bash /bin/sh
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 # Preinstall Android kernel Clang toolchains used by the pipeline
 RUN set -eux; \
