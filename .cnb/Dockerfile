@@ -7,10 +7,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git git-lfs wget curl ca-certificates tar xz-utils \
     build-essential bc bison flex \
-    libelf-dev libssl-dev \
+    libelf-dev libssl-dev libdw-dev \
     dwarves rsync python3 \
     lz4 zstd libncurses-dev bash jq \
     binutils-aarch64-linux-gnu file ccache \
+    libncurses-dev openssl libssl-dev dkms libelf-dev libudev-dev libpciaccess-dev libiberty-dev \
+    zlib1g-dev libc6-dev-i386 lib32z1-dev \
+    libx11-dev libgl1-mesa-dev \
+    libxml2-utils xsltproc \
   && rm -rf /var/lib/apt/lists/*
 
 RUN ln -sf /bin/bash /bin/sh
