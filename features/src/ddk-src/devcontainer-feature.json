@@ -1,0 +1,26 @@
+{
+  "name": "DDK Kernel Source",
+  "id": "ddk-src",
+  "version": "0.1.0",
+  "description": "从 cnb.cool LFS 下载并导入 Android Kernel 源（可选同时导入 kdir）到 /opt/ddk/src/<ver> 与 /opt/ddk/kdir/<ver>",
+  "options": {
+    "androidVer": {
+      "type": "string",
+      "description": "Android 内核源版本（例如 android14-6.1）",
+      "default": "android12-5.10"
+    },
+    "withKdir": {
+      "type": "boolean",
+      "description": "同时导入对应版本的 kdir 包（自动解析 OID）",
+      "default": false
+    },
+    "setDefault": {
+      "type": "boolean",
+      "description": "写入 /etc/profile.d/zz-ddk-src.sh，导出 ANDROID_VER/DDK_ROOT/KDIR（若启用）",
+      "default": true
+    }
+  },
+  "containerEnv": {
+    "DDK_ROOT": "/opt/ddk"
+  }
+}

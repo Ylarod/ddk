@@ -1,0 +1,21 @@
+{
+  "name": "DDK Clang",
+  "id": "ddk-clang",
+  "version": "0.1.0",
+  "description": "从 cnb.cool LFS 下载并导入 Clang 到 /opt/ddk/clang/<ver>",
+  "options": {
+    "clangVer": {
+      "type": "string",
+      "description": "Clang 工具链版本（例如 clang-r487747c）",
+      "default": "clang-r416183b"
+    },
+    "setDefault": {
+      "type": "boolean",
+      "description": "写入 /etc/profile.d/zz-ddk-clang.sh，导出 CLANG_PATH/CLANG_VER/DDK_ROOT",
+      "default": true
+    }
+  },
+  "containerEnv": {
+    "DDK_ROOT": "/opt/ddk"
+  }
+}
