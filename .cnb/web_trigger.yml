@@ -2,4 +2,4 @@ branch:
   - buttons:
       - name: 构建 DDK 矩阵
         description: 手动触发 ddk 矩阵构建并上传打包结果
-        event: build_ddk
+        event: web_trigger_build_ddk

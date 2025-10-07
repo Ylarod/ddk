@@ -15,7 +15,7 @@ $:
             uname -a
 
 main:
-  build_ddk:
+  web_trigger_build_ddk:
     - name: ddk-matrix (manual)
       runner:
         cpus: 32
