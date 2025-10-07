@@ -2,14 +2,13 @@
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-MATRIX := \
-  android12-5.10:clang-r416183b \
-  android13-5.10:clang-r450784e \
-  android13-5.15:clang-r450784e \
-  android14-5.15:clang-r487747c \
-  android14-6.1:clang-r487747c \
-  android15-6.6:clang-r510928  \
-  android16-6.12:clang-r536225
+# 依赖 jq 从 mapping.json 解析矩阵
+JQ := $(shell command -v jq 2>/dev/null)
+ifeq ($(JQ),)
+  $(error "jq 未安装，请先安装 jq 以解析 $(ROOT)/mapping.json")
+endif
+
+MATRIX := $(shell jq -r '.matrix[] | "\(.android):\(.clang)"' $(ROOT)/mapping.json | tr '\n' ' ')
 
 REG ?= ghcr.io/ylarod
 IMG ?= ddk

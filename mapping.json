@@ -1,0 +1,28 @@
+{
+  "clang": [
+    { "version": "clang-r416183b", "branch": "master-kernel-build-2021" },
+    { "version": "clang-r450784e", "branch": "master-kernel-build-2022" },
+    { "version": "clang-r487747c", "branch": "main-kernel-build-2023" },
+    { "version": "clang-r510928",  "branch": "main-kernel-build-2024" },
+    { "version": "clang-r536225",  "branch": "main-kernel-2025" }
+  ],
+  "android": [
+    { "name": "android12-5.10", "branch": "android12-5.10-2025-09_r1" },
+    { "name": "android13-5.10", "branch": "android13-5.10-2025-07_r1" },
+    { "name": "android13-5.15", "branch": "android13-5.15-2025-09_r2" },
+    { "name": "android14-5.15", "branch": "android14-5.15-2025-07_r1" },
+    { "name": "android14-6.1",  "branch": "android14-6.1-2025-09_r4" },
+    { "name": "android15-6.6",  "branch": "android15-6.6-2025-09_r5" },
+    { "name": "android16-6.12", "branch": "android16-6.12-2025-09_r2" }
+  ],
+  "matrix": [
+    { "android": "android12-5.10", "clang": "clang-r416183b" },
+    { "android": "android13-5.10", "clang": "clang-r450784e" },
+    { "android": "android13-5.15", "clang": "clang-r450784e" },
+    { "android": "android14-5.15", "clang": "clang-r487747c" },
+    { "android": "android14-6.1",  "clang": "clang-r487747c" },
+    { "android": "android15-6.6",  "clang": "clang-r510928" },
+    { "android": "android16-6.12", "clang": "clang-r536225" }
+  ]
+}
+
