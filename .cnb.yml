@@ -22,6 +22,7 @@ main:
         cpus: 4
       git:
         enable: true
+        lfs: false
       services:
         - docker
       stages:
@@ -30,15 +31,16 @@ main:
           exports:
             info: IMAGE_TAG
         - name: docker build
-          script: docker build -t $IMAGE_TAG . -f .cnb/cnb-dev/Dockerfile
-        - name: push image
-          script: docker push $IMAGE_TAG
+          script: |
+            git lfs pull --include="clang/"
+            docker buildx build --push -t $IMAGE_TAG . -f .cnb/cnb-dev/Dockerfile
   web_trigger_builder:
     - name: ddk-builder
       runner:
         cpus: 4
       git:
         enable: true
+        lfs: false
       services:
         - docker
       stages:
@@ -48,7 +50,6 @@ main:
             info: IMAGE_TAG
         - name: build image
           script: |
-            git lfs pull --include="clang/"
             docker build -t $IMAGE_TAG . -f .cnb/Dockerfile
             docker push $IMAGE_TAG
   

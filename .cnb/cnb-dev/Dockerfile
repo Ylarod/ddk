@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 FROM docker.cnb.cool/ylarod/ddk/ddk-builder:latest
 
 ENV UV_INSTALL_DIR=/usr/local/bin
@@ -11,11 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip unzip vim gnupg coreutils \
     wget unzip lsof nload htop net-tools dnsutils openssh-server zsh
 
-COPY clang/*.tar.zst /tmp/clang/
-
-RUN set -eux; \
+# 从构建上下文绑定挂载 clang 目录，避免 COPY
+RUN --mount=type=bind,source=clang,target=/mnt/clang,readonly \
+    set -eux; \
     mkdir -p /opt/ddk/clang; \
-    for f in /tmp/clang/*.tar.zst; do \
+    for f in /mnt/clang/*.tar.zst; do \
       [ -e "$f" ] || continue; \
       name="$(basename "$f")"; \
       version="${name%.tar.zst}"; \
@@ -27,8 +28,7 @@ RUN set -eux; \
       else \
         echo "[!] $version already present, skipping"; \
       fi; \
-    done; \
-    rm -rf /tmp/clang
+    done
 
 # install vscode and extension
 RUN curl -fsSL https://code-server.dev/install.sh | sh &&\
