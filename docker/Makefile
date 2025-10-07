@@ -30,7 +30,7 @@ list:
 toolchains:
 	@for pair in $(MATRIX); do \
 	  CLANG=$${pair##*:}; \
-	  if ! $(DOCKER) image inspect $(REG)/$(IMG)/clang:$$CLANG >/dev/null 2>&1; then \
+	  if [ "$(FORCE)" = "1" ] || ! $(DOCKER) image inspect $(REG)/$(IMG)/clang:$$CLANG >/dev/null 2>&1 || $(FORCE); then \
 	    echo "==> Building toolchain $(REG)/$(IMG)/clang:$$CLANG"; \
 	    DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
 	      $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,--load) \

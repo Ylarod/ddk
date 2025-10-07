@@ -5,8 +5,8 @@ WORKDIR /opt/ddk
 ARG CLANG_VER
 
 RUN --mount=type=bind,source=clang/${CLANG_VER}.tar.zst,target=/mnt/clang.tar.zst,readonly \
-    mkdir -p /opt/ddk/clang; \
-    tar -I zstd -xf "/mnt/clang.tar.zst" -C "/opt/ddk/clang/${CLANG_VER}";
+    mkdir -p /opt/ddk/clang/; \
+    tar -I zstd -xf "/mnt/clang.tar.zst" -C "/opt/ddk/clang/";
 
 ENV DDK_ROOT=/opt/ddk \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
