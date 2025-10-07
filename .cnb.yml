@@ -15,6 +15,23 @@ $:
             uname -a
 
 main:
+  web_trigger_builder:
+    - name: ddk-builder
+      runner:
+        cpus: 4
+      git:
+        enable: true
+      services:
+        - docker
+      stages:
+        - name: set docker tag
+          script: echo -n "${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-builder:latest"
+          exports:
+            info: IMAGE_TAG
+        - name: docker build
+          script: docker build -t $IMAGE_TAG . -f .cnb/Dockerfile
+        - name: push image
+          script: docker push $IMAGE_TAG
   web_trigger_build_ddk:
     - name: ddk-matrix (manual)
       runner:

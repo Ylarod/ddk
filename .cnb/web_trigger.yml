@@ -1,5 +1,9 @@
 branch:
   - buttons:
+    - name: 构建 DDK Builder
+      description: 手动触发 ddk-builder 镜像构建
+      event: web_trigger_builder
+  - buttons:
       - name: 构建 DDK 矩阵
         description: 手动触发 ddk 矩阵构建并上传打包结果
         event: web_trigger_build_ddk
