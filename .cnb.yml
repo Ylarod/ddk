@@ -4,7 +4,8 @@ $:
       runner:
         cpus: 64
       docker:
-        build: .ide/Dockerfile
+        image:
+          name: ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-cnb-dev:latest
       services:
         - vscode
         - docker
@@ -15,6 +16,23 @@ $:
             uname -a
 
 main:
+  web_trigger_cnb_dev:
+    - name: ddk-cnb-dev
+      runner:
+        cpus: 4
+      git:
+        enable: true
+      services:
+        - docker
+      stages:
+        - name: set docker tag
+          script: echo -n "${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-cnb-dev:latest"
+          exports:
+            info: IMAGE_TAG
+        - name: docker build
+          script: docker build -t $IMAGE_TAG . -f .cnb/cnb-dev/Dockerfile
+        - name: push image
+          script: docker push $IMAGE_TAG
   web_trigger_builder:
     - name: ddk-builder
       runner:
