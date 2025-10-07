@@ -31,17 +31,18 @@ LABEL org.opencontainers.image.title="DDK ${ANDROID_VER}" \
       io.ddk.kernel.src="${ANDROID_VER}"
 
 RUN --mount=type=bind,source=src/src.${ANDROID_VER}.tar.zst,target=/tmp/src.tar.zst,readonly \
-    mkdir -p /opt/ddk/src/; \
+    --mount=type=bind,source=kdir/kdir.${ANDROID_VER}.tar.zst,target=/tmp/kdir.tar.zst,readonly \
+    mkdir -p /opt/ddk/src/ /opt/ddk/kdir/; \
     tar -xf /tmp/src.tar.zst -C /opt/ddk/src/; \
-    cd /opt/ddk/src/${ANDROID_VER} && make gki_defconfig && make modules_prepare;
+    tar -xf /tmp/kdir.tar.zst -C /opt/ddk/kdir/;
 
 ENV DDK_ROOT=/opt/ddk \
     CROSS_COMPILE=aarch64-linux-gnu- \
     ARCH=arm64 \
     LLVM=1 \
     LLVM_IAS=1 \
-    KERNEL_SRC=/opt/ddk/src/${ANDROID_VER} \
-    KDIR=/opt/ddk/src/${ANDROID_VER} \
+    KERNEL_SRC=/opt/ddk/kdir/${ANDROID_VER} \
+    KDIR=/opt/ddk/kdir/${ANDROID_VER} \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
     PATH=/opt/ddk/clang/${CLANG_VER}/bin:$PATH
 
