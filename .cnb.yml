@@ -1,0 +1,15 @@
+$:
+  vscode:
+    - name: ddk-dev-env
+      runner:
+        cpus: 32
+      docker:
+        build: .ide/Dockerfile
+      services:
+        - vscode
+        - docker
+      stages:
+        - name: env check
+          script: |
+            echo "CPU cores requested: 32"
+            uname -a
