@@ -9,7 +9,26 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     zip unzip vim gnupg coreutils \
-  && rm -rf /var/lib/apt/lists/*
+    wget unzip lsof nload htop net-tools dnsutils openssh-server zsh
+
+COPY clang/*.tar.zst /tmp/clang/
+
+RUN set -eux; \
+    mkdir -p /opt/ddk/clang; \
+    for f in /tmp/clang/*.tar.zst; do \
+      [ -e "$f" ] || continue; \
+      name="$(basename "$f")"; \
+      version="${name%.tar.zst}"; \
+      dest="/opt/ddk/clang/$version"; \
+      if [ ! -d "$dest" ] || [ -z "$(ls -A "$dest" 2>/dev/null || true)" ]; then \
+        echo "[+] Importing $version from $name"; \
+        mkdir -p "$dest"; \
+        tar -I zstd -xf "$f" -C "$dest"; \
+      else \
+        echo "[!] $version already present, skipping"; \
+      fi; \
+    done; \
+    rm -rf /tmp/clang
 
 # install vscode and extension
 RUN curl -fsSL https://code-server.dev/install.sh | sh &&\
@@ -20,9 +39,6 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh &&\
     code-server --install-extension donjayamanne.githistory &&\
     code-server --install-extension cloudstudio.live-server &&\
     code-server --install-extension tencent-cloud.coding-copilot
-
-# 安装 ssh 服务，用于支持 VSCode 客户端通过 Remote-SSH 访问开发环境，开发环境需保留 apt-get 缓存
-RUN apt-get update && apt-get install -y wget unzip lsof nload htop net-tools dnsutils openssh-server zsh
 
 # 安装 uv
 RUN sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)"
