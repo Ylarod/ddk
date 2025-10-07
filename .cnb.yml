@@ -44,31 +44,31 @@ main:
               script: |
                 set -eux
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_clang master-kernel-build-2021 clang-r416183b
             clang-r450784e:
               script: |
                 set -eux
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_clang master-kernel-build-2022 clang-r450784e
             clang-r487747c:
               script: |
                 set -eux
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_clang main-kernel-build-2023 clang-r487747c
             clang-r510928:
               script: |
                 set -eux
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_clang main-kernel-build-2024 clang-r510928
             clang-r536225:
               script: |
                 set -eux
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_clang main-kernel-2025 clang-r536225
         
         - name: build
@@ -77,7 +77,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android12-5.10 android12-5.10-2025-09_r1
                 cd src/android12-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -90,7 +90,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android13-5.10 android13-5.10-2025-07_r1
                 cd src/android13-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -103,7 +103,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android13-5.15 android13-5.15-2025-09_r2
                 cd src/android13-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -116,7 +116,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android14-5.15 android14-5.15-2025-07_r1
                 cd src/android14-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -129,7 +129,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android14-6.1 android14-6.1-2025-09_r4
                 cd src/android14-6.1
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -142,7 +142,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android15-6.6 android15-6.6-2025-09_r5
                 cd src/android15-6.6
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
@@ -155,7 +155,7 @@ main:
               timeout: 4h
               script: |
                 cd /opt/ddk
-                source ./envsetup.sh
+                . ./envsetup.sh
                 setup_source android16-6.12 android16-6.12-2025-09_r2
                 cd src/android16-6.12
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
