@@ -30,9 +30,9 @@ LABEL org.opencontainers.image.title="DDK ${ANDROID_VER}" \
       io.ddk.clang.version="${CLANG_VER}" \
       io.ddk.kernel.src="${ANDROID_VER}"
 
-RUN --mount=type=bind,source=src/src.${ANDROID_VER}.tar,target=/tmp/src.tar,readonly \
+RUN --mount=type=bind,source=src/src.${ANDROID_VER}.tar.zst,target=/tmp/src.tar.zst,readonly \
     mkdir -p /opt/ddk/src/; \
-    tar -xf /tmp/src.tar -C /opt/ddk/src/ --strip-components=1; \
+    tar -xf /tmp/src.tar.zst -C /opt/ddk/src/; \
     cd /opt/ddk/src/${ANDROID_VER} && make gki_defconfig && make modules_prepare;
 
 ENV DDK_ROOT=/opt/ddk \
