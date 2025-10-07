@@ -77,7 +77,9 @@ function build_kernel()
         -e LTO_CLANG_FULL \
         -d THINLTO
     fi
-    make O=$out_path -j$(nproc)
+    # Check and set BUILD_PROC environment variable
+    local build_proc=${BUILD_PROC:-$(nproc)}
+    make O=$out_path -j$build_proc
     set +x
     cd ../..
     # restore path

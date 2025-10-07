@@ -18,216 +18,159 @@ main:
   web_trigger_build_ddk:
     - name: ddk-matrix (manual)
       runner:
-        cpus: 32
+        cpus: 64
       docker:
         image: ubuntu:25.04
       git:
         enable: true
       stages:
+        - name: env setup
+          script: |
+            set -eux
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              git wget ca-certificates tar xz-utils \
+              build-essential bc bison flex \
+              libelf-dev libssl-dev \
+              pahole dwarves rsync python3 \
+              lz4 zstd libncurses-dev \
+              binutils-aarch64-linux-gnu \
+              file && \
+              rm -rf /var/lib/apt/lists/*
+            echo "CPU cores available: $(nproc)"
+            echo "Memory available:"
+            free -h
+            echo "Disk space available:"
+            df -h
+            mkdir -p /opt/ddk
+            rsync -a --delete --exclude .git ./ /opt/ddk/
+        
+        - name: clang setup
+          jobs:
+            clang-r416183b:
+              script: |
+                set -eux
+                cd /opt/ddk
+                source ./envsetup.sh
+                setup_clang master-kernel-build-2021 clang-r416183b
+            clang-r450784e:
+              script: |
+                set -eux
+                cd /opt/ddk
+                source ./envsetup.sh
+                setup_clang master-kernel-build-2022 clang-r450784e
+            clang-r487747c:
+              script: |
+                set -eux
+                cd /opt/ddk
+                source ./envsetup.sh
+                setup_clang main-kernel-build-2023 clang-r487747c
+            clang-r510928:
+              script: |
+                set -eux
+                cd /opt/ddk
+                source ./envsetup.sh
+                setup_clang main-kernel-build-2024 clang-r510928
+            clang-r536225:
+              script: |
+                set -eux
+                cd /opt/ddk
+                source ./envsetup.sh
+                setup_clang main-kernel-2025 clang-r536225
+        
         - name: build
           jobs:
             android12-5.10:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang master-kernel-build-2021 clang-r416183b
                 setup_source android12-5.10 android12-5.10-2025-09_r1
                 cd src/android12-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r416183b android12-5.10
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android12-5.10.tar.zst" android12-5.10
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android12-5.10.tar.zst" android12-5.10
+                BUILD_PROC=9 build_kernel clang-r416183b android12-5.10
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android12-5.10.tar.zst" android12-5.10
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android12-5.10.tar.zst" android12-5.10
 
             android13-5.10:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang master-kernel-build-2022 clang-r450784e
                 setup_source android13-5.10 android13-5.10-2025-07_r1
                 cd src/android13-5.10
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r450784e android13-5.10
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android13-5.10.tar.zst" android13-5.10
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android13-5.10.tar.zst" android13-5.10
+                BUILD_PROC=9 build_kernel clang-r450784e android13-5.10
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android13-5.10.tar.zst" android13-5.10
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android13-5.10.tar.zst" android13-5.10
 
             android13-5.15:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang master-kernel-build-2022 clang-r450784e
                 setup_source android13-5.15 android13-5.15-2025-09_r2
                 cd src/android13-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r450784e android13-5.15
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android13-5.15.tar.zst" android13-5.15
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android13-5.15.tar.zst" android13-5.15
+                BUILD_PROC=9 build_kernel clang-r450784e android13-5.15
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android13-5.15.tar.zst" android13-5.15
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android13-5.15.tar.zst" android13-5.15
 
             android14-5.15:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang main-kernel-build-2023 clang-r487747c
                 setup_source android14-5.15 android14-5.15-2025-07_r1
                 cd src/android14-5.15
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r487747c android14-5.15
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android14-5.15.tar.zst" android14-5.15
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android14-5.15.tar.zst" android14-5.15
+                BUILD_PROC=9 build_kernel clang-r487747c android14-5.15
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android14-5.15.tar.zst" android14-5.15
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android14-5.15.tar.zst" android14-5.15
 
             android14-6.1:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang main-kernel-build-2023 clang-r487747c
                 setup_source android14-6.1 android14-6.1-2025-09_r4
                 cd src/android14-6.1
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r487747c android14-6.1
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android14-6.1.tar.zst" android14-6.1
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android14-6.1.tar.zst" android14-6.1
+                BUILD_PROC=9 build_kernel clang-r487747c android14-6.1
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android14-6.1.tar.zst" android14-6.1
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android14-6.1.tar.zst" android14-6.1
 
             android15-6.6:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  pahole dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang main-kernel-build-2024 clang-r510928
                 setup_source android15-6.6 android15-6.6-2025-09_r5
                 cd src/android15-6.6
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r510928 android15-6.6
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android15-6.6.tar.zst" android15-6.6
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android15-6.6.tar.zst" android15-6.6
+                BUILD_PROC=9 build_kernel clang-r510928 android15-6.6
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android15-6.6.tar.zst" android15-6.6
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android15-6.6.tar.zst" android15-6.6
 
             android16-6.12:
               timeout: 4h
               script: |
-                set -eux
-                export DEBIAN_FRONTEND=noninteractive
-                apt-get update
-                apt-get install -y --no-install-recommends \
-                  git wget ca-certificates tar xz-utils \
-                  build-essential bc bison flex \
-                  libelf-dev libssl-dev \
-                  dwarves rsync python3 \
-                  lz4 zstd libncurses-dev \
-                  binutils-aarch64-linux-gnu \
-                  file && \
-                  rm -rf /var/lib/apt/lists/*
-                ROOT=$PWD
-                mkdir -p /opt/ddk
-                rsync -a --delete --exclude .git ./ /opt/ddk/
                 cd /opt/ddk
                 source ./envsetup.sh
-                setup_clang main-kernel-2025 clang-r536225
                 setup_source android16-6.12 android16-6.12-2025-09_r2
                 cd src/android16-6.12
                 sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
                 cd - >/dev/null
-                build_kernel clang-r536225 android16-6.12
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "$ROOT/src.android16-6.12.tar.zst" android16-6.12
-                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "$ROOT/kdir.android16-6.12.tar.zst" android16-6.12
+                BUILD_PROC=9 build_kernel clang-r536225 android16-6.12
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/src -I 'zstd -T0' -cf "/opt/ddk/src.android16-6.12.tar.zst" android16-6.12
+                tar --sort=name --mtime='UTC 2025-01-01' --owner=0 --group=0 --numeric-owner -C /opt/ddk/kdir -I 'zstd -T0' -cf "/opt/ddk/kdir.android16-6.12.tar.zst" android16-6.12
 
         - name: upload artifacts
           jobs:
@@ -235,17 +178,17 @@ main:
               image: cnbcool/attachments:latest
               settings:
                 attachments:
-                  - "./src.android12-5.10.tar.zst"
-                  - "./kdir.android12-5.10.tar.zst"
-                  - "./src.android13-5.10.tar.zst"
-                  - "./kdir.android13-5.10.tar.zst"
-                  - "./src.android13-5.15.tar.zst"
-                  - "./kdir.android13-5.15.tar.zst"
-                  - "./src.android14-5.15.tar.zst"
-                  - "./kdir.android14-5.15.tar.zst"
-                  - "./src.android14-6.1.tar.zst"
-                  - "./kdir.android14-6.1.tar.zst"
-                  - "./src.android15-6.6.tar.zst"
-                  - "./kdir.android15-6.6.tar.zst"
-                  - "./src.android16-6.12.tar.zst"
-                  - "./kdir.android16-6.12.tar.zst"
+                  - "/opt/ddk/src.android12-5.10.tar.zst"
+                  - "/opt/ddk/kdir.android12-5.10.tar.zst"
+                  - "/opt/ddk/src.android13-5.10.tar.zst"
+                  - "/opt/ddk/kdir.android13-5.10.tar.zst"
+                  - "/opt/ddk/src.android13-5.15.tar.zst"
+                  - "/opt/ddk/kdir.android13-5.15.tar.zst"
+                  - "/opt/ddk/src.android14-5.15.tar.zst"
+                  - "/opt/ddk/kdir.android14-5.15.tar.zst"
+                  - "/opt/ddk/src.android14-6.1.tar.zst"
+                  - "/opt/ddk/kdir.android14-6.1.tar.zst"
+                  - "/opt/ddk/src.android15-6.6.tar.zst"
+                  - "/opt/ddk/kdir.android15-6.6.tar.zst"
+                  - "/opt/ddk/src.android16-6.12.tar.zst"
+                  - "/opt/ddk/kdir.android16-6.12.tar.zst"
