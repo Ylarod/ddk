@@ -14,7 +14,6 @@ jobs:
     permissions:
       packages: write
       contents: write
-      pull-requests: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -25,4 +24,6 @@ jobs:
         uses: devcontainers/action@v1
         with:
           publish-features: "true"
-          base-path-to-features: "./features"
+          base-path-to-features: "./features/src"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
