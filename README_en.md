@@ -1,35 +1,73 @@
-# Kernel Driver Development Kit (DDK)
+# Kernel Driver Development Kit
 
-This toolkit is designed for rapid kernel module development, but it **does not guarantee** full compatibility with the corresponding kernel version.
+This toolkit is designed for rapid kernel module development, but **does not guarantee** that kernel modules will be fully compatible with the corresponding kernel version.
 
-For perfect compatibility, you need to download the full kernel source code and compile it yourself. Refer to the relevant documentation for details.
+If you require full compatibility, please download the complete kernel source code and compile it yourself. Refer to the relevant documentation for specific instructions.
 
-If you prefer not to download Clang, you can use NDK Clang for compilation. However, the compiled output **might** have different structure offsets.
+If you prefer not to download Clang, you can use NDK Clang for compilation, but this **may** result in differences in struct offsets in the compiled artifacts.
 
-## Docker Image Usage (recommended)
+## Usage
 
-This repository includes a convenient shell wrapper at `scripts/ddk` that wraps common Docker commands used with the DDK images.
+## Local Dev Container Development Environment
 
-Behavior highlights:
-- The script mounts the current working directory into the container at `/build` and uses `/build` as the working directory.
-- Docker platform is forced to `linux/amd64` to provide a consistent x86 toolchain.
-- You can pass the image target as a positional argument or with `--target`/`-t`. If you omit the target, the script will use the `DDK_TARGET` environment variable. If neither is set, the script errors.
+Place the following content in `.devcontainer/devcontainer.json`
 
-Examples:
+You can modify the features content to freely assemble the desired image. Available versions can be found at [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+
+References:
+
+- [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
+- [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
+
+```yml
+{
+  "name": "ddk-module-dev",
+  "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
+  "features": {
+    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
+      "clangVer": "clang-r416183b",
+      "setDefault": true
+    },
+    "ghcr.io/ylarod/ddk/features/ddk-src:latest": {
+      "androidVer": "android12-5.10",
+      "withKdir": true,
+      "setDefault": true
+    }
+  },
+  "remoteUser": "root",
+  "postCreateCommand": "echo Devcontainer ready",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-github-actions",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-ceintl.vscode-language-pack-zh-hans"
+      ]
+    }
+  }
+}
+```
+
+
+### Local Docker Image Usage
+
+The repository includes a convenience script `scripts/ddk` that wraps common docker commands, enforcing `--platform linux/amd64` and mounting the current directory to `/build` in the container:
+
+Usage examples:
 
 ```bash
 # Pull image
 ./scripts/ddk pull android12-5.10
 
-# Build in container (runs `make` in current dir)
+# Build
 ./scripts/ddk build --target android12-5.10
 
-# Pass make args
+# Pass make arguments
 ./scripts/ddk build --target android12-5.10 -- CFLAGS=-O2
-
-# Use environment fallback
-export DDK_TARGET=android12-5.10
-./scripts/ddk build   # will use DDK_TARGET
 
 # Clean
 ./scripts/ddk clean --target android12-5.10
@@ -38,51 +76,48 @@ export DDK_TARGET=android12-5.10
 ./scripts/ddk shell --target android12-5.10
 ```
 
-Make sure `scripts/ddk` is executable:
+If you don't want to specify target in every command, you can set the `DDK_TARGET` environment variable:
 
 ```bash
-chmod +x scripts/ddk
+export DDK_TARGET=android12-5.10
+./scripts/ddk build   # Will use DDK_TARGET
 ```
 
-## Docker Image Usage (LEGACY)
+### GitHub CI
 
-Images are published to GitHub Container Registry (GHCR). It's recommended to pull images directly from GHCR instead of downloading large tar files from Releases:
+Refer to the following files for building:
 
-```bash
-# Pull image (example)
-docker pull ghcr.io/ylarod/ddk:android12-5.10
+- Generic Matrix build template: [ddk-lkm.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/ddk-lkm.yml)
+- Module Template build: [module.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/module.yml)
 
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
+### GitHub Codespaces Cloud Development
+
+Place the following content in `.devcontainer/devcontainer.json`
+
+You can modify the image content to select the corresponding version for development. Available versions can be found at [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+
+```yaml
+{
+  "name": "ddk-module-dev",
+  "image": "ghcr.io/ylarod/ddk:android16-6.12",
+  "remoteUser": "root",
+  "postCreateCommand": "echo Devcontainer ready",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-github-actions",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-ceintl.vscode-language-pack-zh-hans"
+      ]
+    }
+  }
+}
 ```
 
-If older documentation or scripts mention downloading `.tar` and importing images, that is outdated — prefer `ghcr.io/ylarod/ddk:<ver>`.
+## Acknowledgments
 
-### Build Modules
-
-```bash
-# x86 devices
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
-
-# M1 devices using Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make
-```
-
-### Clean Build Artifacts
-
-```bash
-# x86 devices
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make clean
-
-# M1 devices using Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make clean
-```
-
-### Interactive Shell
-
-```bash
-# x86 devices
-docker run -it --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10
-
-# M1 devices using Orbstack
-docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10
-```
+- Thanks to [cnb.cool](https://cnb.cool) for providing [computing resources](https://mp.weixin.qq.com/s/4VqdKrvsoidAokKArMZfQA)

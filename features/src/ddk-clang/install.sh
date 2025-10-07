@@ -89,12 +89,20 @@ extract_zst() {
 write_profile() {
   [ "$_SET_DEFAULT" = "true" ] || return 0
   [ -x "$DEST_VER_DIR/bin/clang" ] || return 0
-  mkdir -p /etc/profile.d
-  cat >/etc/profile.d/zz-ddk-clang.sh <<EOF
+  local bashrc="/etc/bash.bashrc"
+  # 确保文件存在
+  touch "$bashrc"
+  # 移除旧的标记块，保持幂等更新
+  sed '/^## ddk-clang begin$/, /^## ddk-clang end$/d' "$bashrc" >"${bashrc}.tmp" || true
+  mv "${bashrc}.tmp" "$bashrc"
+  # 追加新的标记块
+  cat >>"$bashrc" <<EOF
+## ddk-clang begin
 export DDK_ROOT="$DDK_ROOT"
 export CLANG_VER="$_CLANG_VER"
 export CLANG_PATH="$DEST_VER_DIR/bin"
 export PATH="$DEST_VER_DIR/bin":$PATH
+## ddk-clang end
 EOF
 }
 

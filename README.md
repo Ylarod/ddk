@@ -6,7 +6,57 @@
 
 如果不想下载 Clang，可以使用 NDK Clang 进行编译，但**可能**会导致编译产物的结构体偏移有所不同。
 
-## Docker 镜像使用教程（推荐）
+## 使用方法
+
+> [!TIP]
+> 对于中国大陆用户，可以使用 docker.cnb.cool/ylarod/ddk/ddk 来代替 ghcr.io/ylarod/ddk
+
+## 本地部署 Dev Container 开发环境
+
+把下面内容放置到 .devcontainer/devcontainer.json
+
+可以修改 features 的内容来自由组装想要的镜像，可以选择的版本参考 [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+
+参考：
+
+- [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
+- [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
+
+```yml
+{
+  "name": "ddk-module-dev",
+  "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
+  "features": {
+    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
+      "clangVer": "clang-r416183b",
+      "setDefault": true
+    },
+    "ghcr.io/ylarod/ddk/features/ddk-src:latest": {
+      "androidVer": "android12-5.10",
+      "withKdir": true,
+      "setDefault": true
+    }
+  },
+  "remoteUser": "root",
+  "postCreateCommand": "echo Devcontainer ready",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-github-actions",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-ceintl.vscode-language-pack-zh-hans"
+      ]
+    }
+  }
+}
+```
+
+
+### 本地使用 Docker 镜像
 
 仓库内包含一个便利脚本 `scripts/ddk`，封装了常用的 docker 命令，强制使用 `--platform linux/amd64` 并把当前目录挂载到容器的 `/build`：
 
@@ -36,47 +86,41 @@ export DDK_TARGET=android12-5.10
 ./scripts/ddk build   # 会使用 DDK_TARGET
 ```
 
-脚本位置：`scripts/ddk`（请确保它有可执行权限）。
+### Github CI
 
-## Docker 镜像使用教程（传统）
+参考下面的文件构建：
 
-镜像已发布到 GitHub Container Registry（GHCR）。推荐直接从 GHCR 拉取镜像，而不是从 Release 下载大型 tar：
+- 通用 Matrix 构建模板：[ddk-lkm.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/ddk-lkm.yml)
+- Module Template 构建：[module.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/module.yml)
 
-```bash
-# 拉取镜像（示例）
-docker pull ghcr.io/ylarod/ddk:android12-5.10
+### Github Codespaces 云开发
 
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
+把下面内容放置到 .devcontainer/devcontainer.json
+
+可以修改 image 的内容来选择对应的版本开发，可以选择的版本参考 [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+
+```yaml
+{
+  "name": "ddk-module-dev",
+  "image": "ghcr.io/ylarod/ddk:android16-6.12",
+  "remoteUser": "root",
+  "postCreateCommand": "echo Devcontainer ready",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "github.vscode-github-actions",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-ceintl.vscode-language-pack-zh-hans"
+      ]
+    }
+  }
+}
 ```
 
-如果你之前的文档或者脚本提到从 Release 下载并导入 `.tar`，那部分已过时：现在推荐直接从 `ghcr.io/ylarod/ddk:<ver>` 拉取。
+## 致谢
 
-### 构建模块
-
-```bash
-# x86 设备
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make
-
-# M1 设备使用 Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make
-```
-
-### 清理构建产物
-
-```bash
-# x86 设备
-docker run --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10 make clean
-
-# M1 设备使用 Orbstack
-docker run --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10 make clean
-```
-
-### 进入交互式 Shell
-
-```bash
-# x86 设备
-docker run -it --rm -v /tmp/testko:/build -w /build ghcr.io/ylarod/ddk:android12-5.10
-
-# M1 设备使用 Orbstack
-docker run -it --rm -v /tmp/testko:/build -w /build --platform linux/amd64 ghcr.io/ylarod/ddk:android12-5.10
-```
+- 感谢 [cnb.cool](https://cnb.cool) 提供的 [计算资源](https://mp.weixin.qq.com/s/4VqdKrvsoidAokKArMZfQA)

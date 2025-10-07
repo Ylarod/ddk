@@ -1,6 +1,17 @@
 {
   "name": "ddk-module-dev",
-  "image": "ghcr.io/ylarod/ddk-dev:android12-5.10",
+  "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
+  "features": {
+    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
+      "clangVer": "clang-r416183b",
+      "setDefault": true
+    },
+    "ghcr.io/ylarod/ddk/features/ddk-src:latest": {
+      "androidVer": "android12-5.10",
+      "withKdir": true,
+      "setDefault": true
+    }
+  },
   "remoteUser": "root",
   "postCreateCommand": "echo Devcontainer ready",
   "customizations": {

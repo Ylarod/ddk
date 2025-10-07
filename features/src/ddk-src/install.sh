@@ -89,15 +89,23 @@ auto_oid_from_pointer() {
 write_profile() {
   [ "$_SET_DEFAULT" = "true" ] || return 0
   [ -d "$SRC_DIR" ] || return 0
-  mkdir -p /etc/profile.d
+  local bashrc="/etc/bash.bashrc"
   local kdir_line=""
   if [ "$_WITH_KDIR" = "true" ] && [ -d "$KDIR_DIR" ]; then
     kdir_line="export KDIR=\"$KDIR_DIR\""
   fi
-  cat >/etc/profile.d/zz-ddk-src.sh <<EOF
+  # 确保文件存在
+  touch "$bashrc"
+  # 移除旧的标记块，保持幂等更新
+  sed '/^## ddk-src begin$/, /^## ddk-src end$/d' "$bashrc" >"${bashrc}.tmp" || true
+  mv "${bashrc}.tmp" "$bashrc"
+  # 追加新的标记块
+  cat >>"$bashrc" <<EOF
+## ddk-src begin
 export DDK_ROOT="$DDK_ROOT"
 export ANDROID_VER="$_ANDROID_VER"
 ${kdir_line}
+## ddk-src end
 EOF
 }
 
