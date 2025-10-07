@@ -2,7 +2,7 @@ $:
   vscode:
     - name: ddk-dev-env
       runner:
-        cpus: 32
+        cpus: 64
       docker:
         build: .ide/Dockerfile
       services:
@@ -11,7 +11,7 @@ $:
       stages:
         - name: env check
           script: |
-            echo "CPU cores requested: 32"
+            echo "CPU cores requested: 64"
             uname -a
 
 main:
@@ -20,31 +20,23 @@ main:
       runner:
         cpus: 64
       docker:
-        image: ubuntu:25.04
+        build: .cnb/Dockerfile
       git:
         enable: true
       stages:
         - name: env setup
           script: |
             set -eux
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update
-            apt-get install -y --no-install-recommends \
-              git wget ca-certificates tar xz-utils \
-              build-essential bc bison flex \
-              libelf-dev libssl-dev \
-              pahole dwarves rsync python3 \
-              lz4 zstd libncurses-dev \
-              binutils-aarch64-linux-gnu \
-              file && \
-              rm -rf /var/lib/apt/lists/*
             echo "CPU cores available: $(nproc)"
             echo "Memory available:"
             free -h
             echo "Disk space available:"
             df -h
+            pwd
+            ls -al
             mkdir -p /opt/ddk
-            rsync -a --delete --exclude .git ./ /opt/ddk/
+            rsync -av --exclude .git ./ /opt/ddk/
+            ls -al /opt/ddk
         
         - name: clang setup
           jobs:
