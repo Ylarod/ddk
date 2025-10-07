@@ -3,6 +3,7 @@ name: "Publish Dev Container Features (latest)"
 on:
   push:
     paths:
+      - '.github/workflows/feature.yml'
       - 'features/**'    # 只在 features 目录有改动时触发
     branches:
       - main             # 仅 main 分支构建，可改为你自己的主分支
