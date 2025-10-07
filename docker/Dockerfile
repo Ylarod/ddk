@@ -30,18 +30,18 @@ LABEL org.opencontainers.image.title="DDK ${ANDROID_VER}" \
       io.ddk.clang.version="${CLANG_VER}" \
       io.ddk.kernel.src="${ANDROID_VER}"
 
-RUN --mount=type=bind,source=.pkg/src.${ANDROID_VER}.tar,target=/tmp/src.tar,readonly \
-    --mount=type=bind,source=.pkg/kdir.${ANDROID_VER}.tar,target=/tmp/kdir.tar,readonly \
-    mkdir -p /opt/ddk/src/${ANDROID_VER} /opt/ddk/kdir/${ANDROID_VER} && \
-    tar -xf /tmp/src.tar  -C /opt/ddk/src/${ANDROID_VER}  --strip-components=1 && \
-    tar -xf /tmp/kdir.tar -C /opt/ddk/kdir/${ANDROID_VER} --strip-components=1
+RUN --mount=type=bind,source=src/src.${ANDROID_VER}.tar,target=/tmp/src.tar,readonly \
+    mkdir -p /opt/ddk/src/${ANDROID_VER} /opt/ddk/kdir/${ANDROID_VER}; \
+    tar -xf /tmp/src.tar  -C /opt/ddk/src/${ANDROID_VER} --strip-components=1; \
+    cd /opt/ddk/src/${ANDROID_VER} && make gki_defconfig && make modules_prepare;
 
 ENV DDK_ROOT=/opt/ddk \
     CROSS_COMPILE=aarch64-linux-gnu- \
     ARCH=arm64 \
     LLVM=1 \
     LLVM_IAS=1 \
-    KERNEL_SRC=/opt/ddk/kdir/${ANDROID_VER} \
+    KERNEL_SRC=/opt/ddk/src/${ANDROID_VER} \
+    KDIR=/opt/ddk/src/${ANDROID_VER} \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
     PATH=/opt/ddk/clang/${CLANG_VER}/bin:$PATH
 

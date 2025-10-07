@@ -5,8 +5,7 @@ DATE="$(date +%Y%m%d)"
 
 IMAGES=$(docker image ls --format "{{.Repository}}:{{.Tag}}" \
   | grep 'ghcr.io/ylarod/ddk' \
-  | grep -v "<none>" \
-  | grep -v "ddk-base")
+  | grep -v "<none>" )
 
 for img in $IMAGES; do
   repo="${img%%:*}"

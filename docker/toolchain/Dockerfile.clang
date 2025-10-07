@@ -1,15 +1,12 @@
-FROM ubuntu:24.04
+FROM docker.cnb.cool/ylarod/ddk/ddk-builder:latest
 
 WORKDIR /opt/ddk
 
 ARG CLANG_VER
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    make \
-    pahole \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --link clang/${CLANG_VER} ./clang/${CLANG_VER}
+RUN --mount=type=bind,source=clang/${CLANG_VER}.tar.zst,target=/mnt/clang.tar.zst,readonly \
+    mkdir -p /opt/ddk/clang; \
+    tar -I zstd -xf "/mnt/clang.tar.zst" -C "/opt/ddk/clang/${CLANG_VER}";
 
 ENV DDK_ROOT=/opt/ddk \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \

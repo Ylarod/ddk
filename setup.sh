@@ -35,15 +35,6 @@ setup_source android14-6.1 android14-6.1-2025-09_r4
 setup_source android15-6.6 android15-6.6-2025-09_r5
 setup_source android16-6.12 android16-6.12-2025-09_r2
 
-echo "[+] Patch kernel"
-set -x
-for dir in src/*; do 
-    pushd $dir
-    sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
-    popd
-done
-set +x
-
 echo "[+] Build kernel"
 build_kernel clang-r416183b android12-5.10
 build_kernel clang-r450784e android13-5.10

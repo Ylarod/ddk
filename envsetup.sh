@@ -29,6 +29,9 @@ function setup_source()
     fi
     echo "[+] Clone $name (branch: $branch)"
     git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 src/$name
+    pushd src/$name
+    sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
+    popd
 }
 
 function build_kernel()

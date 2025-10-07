@@ -54,12 +54,9 @@ main:
             docker push $IMAGE_TAG
   
   web_trigger_build_ddk:
-    - name: ddk-matrix (manual)
+    - name: ddk
       runner:
-        cpus: 64
-      docker:
-        image:
-          name: ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-builder:latest
+        cpus: 4
       git:
         enable: true
       stages:

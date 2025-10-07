@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7-labs
 FROM docker.cnb.cool/ylarod/ddk/ddk-builder:latest
 
 ENV UV_INSTALL_DIR=/usr/local/bin
