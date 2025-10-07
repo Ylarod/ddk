@@ -1,0 +1,28 @@
+name: "Publish Dev Container Features (latest)"
+
+on:
+  push:
+    paths:
+      - 'features/**'    # 只在 features 目录有改动时触发
+    branches:
+      - main             # 仅 main 分支构建，可改为你自己的主分支
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Publish Features to GHCR
+        uses: devcontainers/action@v1
+        with:
+          publish-features: "true"
+          base-path-to-features: "./features"
