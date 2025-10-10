@@ -1,18 +1,29 @@
-# Kernel Driver Development Kit
+# Kernel Driver Development Kit (DDK)
 
-This toolkit is designed for rapid kernel module development, but **does not guarantee** that kernel modules will be fully compatible with the corresponding kernel version.
+English | [简体中文](README.md)
 
-If you require full compatibility, please download the complete kernel source code and compile it yourself. Refer to the relevant documentation for specific instructions.
+This toolkit aims to speed up kernel module development, but it **does not guarantee** that modules will be fully compatible with the corresponding kernel version.
 
-If you prefer not to download Clang, you can use NDK Clang for compilation, but this **may** result in differences in struct offsets in the compiled artifacts.
+If you need full compatibility, please download the complete kernel source and compile it yourself; see relevant documentation for details.
+
+If you prefer not to download Clang, you can use NDK Clang to build, but this **may** lead to different struct offsets in the compiled artifacts.
+
+Please do not clone this repository directly because it uses Git LFS to store large files. If you need to clone, use:
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Ylarod/ddk
+```
 
 ## Usage
 
+> [!TIP]
+> For users in Mainland China, you can use `docker.cnb.cool/ylarod/ddk/ddk` as a replacement for `ghcr.io/ylarod/ddk`.
+
 ## Local Dev Container Development Environment
 
-Place the following content in `.devcontainer/devcontainer.json`
+Place the following content in `.devcontainer/devcontainer.json`.
 
-You can modify the features content to freely assemble the desired image. Available versions can be found at [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+You can modify the `features` to assemble the image you need. Available versions: [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
 
 References:
 
@@ -55,46 +66,57 @@ References:
 
 ### Local Docker Image Usage
 
-The repository includes a convenience script `scripts/ddk` that wraps common docker commands, enforcing `--platform linux/amd64` and mounting the current directory to `/build` in the container:
+It is recommended to install the convenience script `ddk` first (wraps common docker commands, enforces `--platform linux/amd64`, and mounts the current directory to `/build` in the container).
+
+Install (macOS/Linux):
+
+```bash
+# Install ddk to /usr/local/bin and make it executable
+sudo curl -fsSL https://raw.githubusercontent.com/Ylarod/ddk/main/scripts/ddk -o /usr/local/bin/ddk
+sudo chmod +x /usr/local/bin/ddk
+```
 
 Usage examples:
 
 ```bash
 # Pull image
-./scripts/ddk pull android12-5.10
+ddk pull android12-5.10
+
+# Enter project directory
+cd /path/to/source
 
 # Build
-./scripts/ddk build --target android12-5.10
+ddk build --target android12-5.10
 
 # Pass make arguments
-./scripts/ddk build --target android12-5.10 -- CFLAGS=-O2
+ddk build --target android12-5.10 -- CFLAGS=-O2
 
 # Clean
-./scripts/ddk clean --target android12-5.10
+ddk clean --target android12-5.10
 
 # Interactive shell
-./scripts/ddk shell --target android12-5.10
+ddk shell --target android12-5.10
 ```
 
-If you don't want to specify target in every command, you can set the `DDK_TARGET` environment variable:
+If you don't want to pass `--target` every time, set the `DDK_TARGET` environment variable:
 
 ```bash
 export DDK_TARGET=android12-5.10
-./scripts/ddk build   # Will use DDK_TARGET
+ddk build   # Will use DDK_TARGET
 ```
 
 ### GitHub CI
 
-Refer to the following files for building:
+Refer to the following workflow files to build:
 
 - Generic Matrix build template: [ddk-lkm.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/ddk-lkm.yml)
 - Module Template build: [module.yml](https://github.com/Ylarod/ddk/blob/main/.github/workflows/module.yml)
 
 ### GitHub Codespaces Cloud Development
 
-Place the following content in `.devcontainer/devcontainer.json`
+Place the following content in `.devcontainer/devcontainer.json`.
 
-You can modify the image content to select the corresponding version for development. Available versions can be found at [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
+You can modify the `image` value to pick the desired version for development. Available versions: [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
 
 ```yaml
 {

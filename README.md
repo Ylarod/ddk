@@ -1,10 +1,18 @@
 # 内核驱动开发工具包 (Kernel Driver Development Kit)
 
+[English](README_en.md) | 简体中文
+
 该工具包旨在快速开发内核模块，但**不保证**内核模块能够完全兼容对应版本的内核。
 
 如果需要完全兼容性，请下载完整内核代码并自行编译，具体方法请参考相关文档。
 
 如果不想下载 Clang，可以使用 NDK Clang 进行编译，但**可能**会导致编译产物的结构体偏移有所不同。
+
+请不要直接 clone 这个仓库，因为使用了 LFS 保存了大文件，如果需要 clone 请使用：
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Ylarod/ddk
+```
 
 ## 使用方法
 
@@ -58,32 +66,43 @@
 
 ### 本地使用 Docker 镜像
 
-仓库内包含一个便利脚本 `scripts/ddk`，封装了常用的 docker 命令，强制使用 `--platform linux/amd64` 并把当前目录挂载到容器的 `/build`：
+推荐先安装便捷脚本 `ddk`（封装常用 docker 命令，强制 `--platform linux/amd64` 并将当前目录挂载为容器内的 `/build`）。
+
+安装（macOS/Linux）：
+
+```bash
+# 将 ddk 安装到 /usr/local/bin 并赋予可执行权限
+sudo curl -fsSL https://raw.githubusercontent.com/Ylarod/ddk/main/scripts/ddk -o /usr/local/bin/ddk
+sudo chmod +x /usr/local/bin/ddk
+```
 
 用法示例：
 
 ```bash
 # 拉取镜像
-./scripts/ddk pull android12-5.10
+ddk pull android12-5.10
+
+# 进入项目目录
+cd /path/to/source
 
 # 构建
-./scripts/ddk build --target android12-5.10
+ddk build --target android12-5.10
 
 # 传递 make 参数
-./scripts/ddk build --target android12-5.10 -- CFLAGS=-O2
+ddk build --target android12-5.10 -- CFLAGS=-O2
 
 # 清理
-./scripts/ddk clean --target android12-5.10
+ddk clean --target android12-5.10
 
 # 交互式 shell
-./scripts/ddk shell --target android12-5.10
+ddk shell --target android12-5.10
 ```
 
 如果你不想在每次命令中传入 target，可以设置环境变量 `DDK_TARGET`：
 
 ```bash
 export DDK_TARGET=android12-5.10
-./scripts/ddk build   # 会使用 DDK_TARGET
+ddk build   # 会使用 DDK_TARGET
 ```
 
 ### Github CI
