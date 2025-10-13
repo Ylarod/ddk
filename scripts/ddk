@@ -8,6 +8,7 @@ usage() {
 Usage: $prog <command> [options] [-- <make-args>]
 
 Commands:
+  list                                        List all pulled DDK images
   pull [--target <target>] <target>           Pull image ghcr.io/ylarod/ddk:<target>
   build [--target <target>] [-- <make-args>]
                                               Run 'make' inside container (for building)
@@ -22,6 +23,7 @@ Options:
   -h, --help     show this help
 
 Examples:
+  $prog list
   $prog pull android12-5.10
   $prog build --target android12-5.10 -- CFLAGS=-O2
   $prog clean android12-5.10
@@ -30,6 +32,11 @@ EOF
 }
 
 if [ $# -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   usage
   exit 1
 fi
@@ -45,7 +52,9 @@ while [[ $# -gt 0 ]]; do
     --target|-t)
       TARGET="$2"; shift 2;;
     --help|-h)
-      usage; exit 0;;
+      usage
+      exit 0
+      ;;
     --)
       shift
       MAKE_ARGS=("$@")
@@ -66,6 +75,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Handle 'list' command early since it doesn't need TARGET
+if [[ "$cmd" == "list" ]]; then
+  echo "Pulled DDK images:"
+  docker images --filter "reference=ghcr.io/ylarod/ddk" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+  exit 0
+fi
 
 if [[ -z "$TARGET" ]]; then
   # Try environment variable fallback
