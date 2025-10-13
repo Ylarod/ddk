@@ -20,7 +20,12 @@ RUN curl -fsSL https://code-server.dev/install.sh | ARCH=amd64 sh &&\
     code-server --install-extension mhutchie.git-graph &&\
     code-server --install-extension donjayamanne.githistory &&\
     code-server --install-extension cloudstudio.live-server &&\
-    code-server --install-extension tencent-cloud.coding-copilot
+    code-server --install-extension tencent-cloud.coding-copilot &&\
+    code-server --install-extension github.vscode-github-actions &&\
+    code-server --install-extension llvm-vs-code-extensions.vscode-clangd &&\
+    code-server --install-extension ms-azuretools.vscode-containers &&\
+    code-server --install-extension ms-azuretools.vscode-docker &&\
+    code-server --install-extension ms-ceintl.vscode-language-pack-zh-hans
 
 # 安装 uv
 RUN sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)"
