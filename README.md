@@ -8,11 +8,7 @@
 
 如果不想下载 Clang，可以使用 NDK Clang 进行编译，但**可能**会导致编译产物的结构体偏移有所不同。
 
-请不要直接 clone 这个仓库，因为使用了 LFS 保存了大文件，如果需要 clone 请使用：
-
-```bash
-GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Ylarod/ddk
-```
+submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodules
 
 ## 使用方法
 

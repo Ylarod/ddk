@@ -8,11 +8,7 @@ If you need full compatibility, please download the complete kernel source and c
 
 If you prefer not to download Clang, you can use NDK Clang to build, but this **may** lead to different struct offsets in the compiled artifacts.
 
-Please do not clone this repository directly because it uses Git LFS to store large files. If you need to clone, use:
-
-```bash
-GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Ylarod/ddk
-```
+Prebuilts tarball in submodule is very large，do not clone submodules if unnecessary.
 
 ## Usage
 

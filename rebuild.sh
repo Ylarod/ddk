@@ -1,20 +1,13 @@
 #!/usr/bin/env bash
 
-# If not running in /opt/ddk, bind-mount current directory to /opt/ddk and cd there
-if [ "$PWD" != "/opt/ddk" ]; then
-  if [ ! -d /opt/ddk ]; then
-    sudo mkdir -p /opt/ddk
-  fi
-  if ! mountpoint -q /opt/ddk; then
-    echo "[+] Bind-mounting $PWD -> /opt/ddk"
-    sudo mount --bind "$PWD" /opt/ddk
-  fi
-  cd /opt/ddk || { echo "Failed to cd /opt/ddk"; exit 1; }
+if [ ! -d "/opt/ddk" ]; then
+  echo "/opt/ddk is not exist";
+  exit 1;
 fi
 
 source ./envsetup.sh
 
-rm -rf kdir/android*
+rm -rf /opt/ddk/kdir/android*
 
 MAP_FILE=${MAP_FILE:-./mapping.json}
 if [ ! -f "$MAP_FILE" ]; then

@@ -4,7 +4,7 @@ function setup_clang()
 {
     local branch=$1
     local version=$2
-    if [ -d clang/$version ]; then
+    if [ -d /opt/ddk/clang/$version ]; then
         echo "[!] $version already exists, skip"
         return
     fi
@@ -12,8 +12,8 @@ function setup_clang()
     local url=$url_prefix/$branch/$version.tar.gz
     echo "[+] Download from $url"
     wget $url
-    mkdir -p clang/$version
-    tar xzvf $version.tar.gz -C clang/$version
+    mkdir -p /opt/ddk/clang/$version
+    tar xzvf $version.tar.gz -C /opt/ddk/clang/$version
 }
 
 function setup_source()
@@ -23,13 +23,13 @@ function setup_source()
     if [ -z "$branch" ]; then
         branch="$name"
     fi
-    if [ -d src/$name ]; then
+    if [ -d /opt/ddk/src/$name ]; then
         echo "[!] $name already exists, skip"
         return
     fi
     echo "[+] Clone $name (branch: $branch)"
-    git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 src/$name
-    pushd src/$name
+    git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 /opt/ddk/src/$name
+    pushd /opt/ddk/src/$name
     sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
     popd
 }
@@ -38,13 +38,13 @@ function build_kernel()
 {
     local clang_version=$1
     local branch=$2
-    if [ -d kdir/$branch ]; then
+    if [ -d /opt/ddk/kdir/$branch ]; then
         echo "[!] $branch already exists, skip"
         return
     fi
     local cache_path=$PATH
-    local out_path=$(realpath kdir/$branch)
-    local clang_path=$(realpath clang/$clang_version/bin)
+    local out_path=$(realpath /opt/ddk/kdir/$branch)
+    local clang_path=$(realpath /opt/ddk/clang/$clang_version/bin)
     echo "[+] Building $branch"
     # setup env
     set -x
@@ -53,7 +53,7 @@ function build_kernel()
     export ARCH=arm64
     export LLVM=1
     export LLVM_IAS=1
-    cd src/$branch
+    pushd /opt/ddk/src/$branch
     make O=$out_path gki_defconfig
     if [ "${LTO}" = "none" ]; then
         scripts/config --file $out_path/.config \
@@ -84,7 +84,7 @@ function build_kernel()
     local build_proc=${BUILD_PROC:-$(nproc)}
     make O=$out_path -j$build_proc
     set +x
-    cd ../..
+    popd
     # restore path
     export PATH=$cache_path
 }

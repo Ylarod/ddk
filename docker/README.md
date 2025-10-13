@@ -16,9 +16,9 @@ After compilation, create modules by referring to `module_template`.
 ### Quick verification of build correctness
 
 ```sh
-cat kdir/android12-5.10/Module.symvers | grep module_layout
-cat kdir/android13-5.15/Module.symvers | grep module_layout
-cat kdir/android14-6.1/Module.symvers | grep module_layout
+cat /opt/ddk/kdir/android12-5.10/Module.symvers | grep module_layout
+cat /opt/ddk/kdir/android13-5.15/Module.symvers | grep module_layout
+cat /opt/ddk/kdir/android14-6.1/Module.symvers | grep module_layout
 ```
 
 Compare outputs:
@@ -66,5 +66,3 @@ make -C docker build VER=android14-6.1 PUSH=1
 ```bash
 make -C docker devcontainer-all PUSH=1
 ```
-
-`make pack` writes `.pkg/src.<VER>.tar` and `.pkg/kdir.<VER>.tar`, which are used for offline or CI builds.
