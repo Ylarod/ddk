@@ -26,7 +26,7 @@ Examples:
   $prog list
   $prog pull android12-5.10
   $prog build --target android12-5.10 -- CFLAGS=-O2
-  $prog clean android12-5.10
+  $prog clean -t android12-5.10
   $prog shell -t android12-5.10
 EOF
 }
