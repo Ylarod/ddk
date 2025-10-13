@@ -17,6 +17,9 @@ Prebuilts tarball in submodule is very large，do not clone submodules if unnece
 
 ### Local Dev Container Development Environment
 
+> [!WARNING]
+> You must `source envsetup.sh` when you use this method
+
 Place the following content in `.devcontainer/devcontainer.json`.
 
 You can modify the `features` to assemble the image you need. Available versions: [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)

@@ -17,6 +17,9 @@ submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodul
 
 ### 本地部署 Dev Container 开发环境
 
+> [!WARNING]
+> 当你使用这个方法的时候，你必须手动 `source envsetup.sh`
+
 把下面内容放置到 .devcontainer/devcontainer.json
 
 可以修改 features 的内容来自由组装想要的镜像，可以选择的版本参考 [ddk image versions](https://github.com/Ylarod/ddk/pkgs/container/ddk/versions)
