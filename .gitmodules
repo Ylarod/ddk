@@ -1,0 +1,3 @@
+[submodule "prebuilts"]
+	path = prebuilts
+	url = https://cnb.cool/Ylarod/ddk-prebuilts
