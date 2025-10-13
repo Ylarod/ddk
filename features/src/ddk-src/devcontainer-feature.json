@@ -1,7 +1,7 @@
 {
   "name": "DDK Kernel Source",
   "id": "ddk-src",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "从 cnb.cool LFS 下载并导入 Android Kernel 源（可选同时导入 kdir）到 /opt/ddk/src/<ver> 与 /opt/ddk/kdir/<ver>",
   "options": {
     "androidVer": {

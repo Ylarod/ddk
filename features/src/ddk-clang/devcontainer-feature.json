@@ -1,7 +1,7 @@
 {
   "name": "DDK Clang",
   "id": "ddk-clang",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "从 cnb.cool LFS 下载并导入 Clang 到 /opt/ddk/clang/<ver>",
   "options": {
     "clangVer": {
