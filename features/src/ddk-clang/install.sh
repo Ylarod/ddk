@@ -10,8 +10,8 @@ DDK_ROOT=/opt/ddk
 DEST_DIR="$DDK_ROOT/clang"
 DEST_VER_DIR="$DEST_DIR/$_CLANG_VER"
 FILENAME="$_CLANG_VER.tar.zst"
-URL_BASE="https://cnb.cool/Ylarod/ddk/-/lfs"
-RAW_BASE="https://cnb.cool/Ylarod/ddk/-/git/raw/main"
+URL_BASE="https://cnb.cool/Ylarod/ddk-prebuilts/-/lfs"
+RAW_BASE="https://cnb.cool/Ylarod/ddk-prebuilts/-/git/raw/main"
 
 require_tools() {
   command -v tar >/dev/null || { echo "需要 tar"; exit 1; }

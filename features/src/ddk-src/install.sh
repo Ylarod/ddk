@@ -14,8 +14,8 @@ SRC_FILENAME="src.$_ANDROID_VER.tar.zst"
 KDIR_DEST_DIR="$DDK_ROOT/kdir"
 KDIR_DIR="$KDIR_DEST_DIR/$_ANDROID_VER"
 KDIR_FILENAME="kdir.$_ANDROID_VER.tar.zst"
-URL_BASE="https://cnb.cool/Ylarod/ddk/-/lfs"
-RAW_BASE="https://cnb.cool/Ylarod/ddk/-/git/raw/main"
+URL_BASE="https://cnb.cool/Ylarod/ddk-prebuilts/-/lfs"
+RAW_BASE="https://cnb.cool/Ylarod/ddk-prebuilts/-/git/raw/main"
 
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
 

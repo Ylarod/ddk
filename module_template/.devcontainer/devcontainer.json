@@ -13,7 +13,7 @@
     }
   },
   "remoteUser": "root",
-  "postCreateCommand": "echo Devcontainer ready",
+  "postCreateCommand": "make && make compdb && echo Devcontainer ready",
   "customizations": {
     "vscode": {
       "extensions": [
