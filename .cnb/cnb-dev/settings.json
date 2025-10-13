@@ -1,5 +1,0 @@
-{
-    "gitblame.inlineMessageFormat": "${author.name}, (${time.ago}) · ${commit.summary}",
-    "terminal.integrated.suggest.enabled": true,
-    "terminal.integrated.shellIntegration.environmentReporting": true
-}

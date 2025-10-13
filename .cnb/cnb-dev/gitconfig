@@ -1,5 +1,0 @@
-[http]
-    postBuffer = 524288000
-[lfs]
-    locksverify = true
-    activitytimeout = 3600
