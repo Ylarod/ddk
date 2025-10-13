@@ -15,7 +15,7 @@ submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodul
 > [!TIP]
 > 对于中国大陆用户，可以使用 docker.cnb.cool/ylarod/ddk/ddk 来代替 ghcr.io/ylarod/ddk
 
-## 本地部署 Dev Container 开发环境
+### 本地部署 Dev Container 开发环境
 
 把下面内容放置到 .devcontainer/devcontainer.json
 
@@ -25,6 +25,14 @@ submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodul
 
 - [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
 - [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
+
+对于 M1 Mac + orbstack 用户，参考 `module_template/.devcontainer` 下的配置可以开发，还需要提取拉取镜像
+
+```bash
+docker run --platform linux/amd64 --rm -it docker.cnb.cool/ylarod/ddk/ddk-builder:latest
+```
+
+对于 x86_64 用户：
 
 ```yml
 {

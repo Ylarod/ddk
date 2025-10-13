@@ -15,7 +15,7 @@ Prebuilts tarball in submodule is very large，do not clone submodules if unnece
 > [!TIP]
 > For users in Mainland China, you can use `docker.cnb.cool/ylarod/ddk/ddk` as a replacement for `ghcr.io/ylarod/ddk`.
 
-## Local Dev Container Development Environment
+### Local Dev Container Development Environment
 
 Place the following content in `.devcontainer/devcontainer.json`.
 
@@ -25,6 +25,14 @@ References:
 
 - [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
 - [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
+
+For users with M1 Mac + orbstack, Ref to `module_template/.devcontainer`, and pull image in advance.
+
+```bash
+docker run --platform linux/amd64 --rm -it docker.cnb.cool/ylarod/ddk/ddk-builder:latest
+```
+
+For x86_64 users:
 
 ```yml
 {

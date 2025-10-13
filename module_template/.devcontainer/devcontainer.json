@@ -1,6 +1,10 @@
 {
   "name": "ddk-module-dev",
-  "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "ddk",
+  "workspaceFolder": "/workspace",
   "features": {
     "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
       "clangVer": "clang-r416183b",
@@ -13,7 +17,7 @@
     }
   },
   "remoteUser": "root",
-  "postCreateCommand": "make && make compdb && echo Devcontainer ready",
+  "postCreateCommand": "echo Devcontainer ready",
   "customizations": {
     "vscode": {
       "extensions": [

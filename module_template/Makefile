@@ -9,7 +9,7 @@ ccflags-y += -Wno-unused-result
 ccflags-y += -Wno-unused-function
 ccflags-y += -Wno-builtin-macro-redefined -U__FILE__ -D__FILE__='""'
 
-KDIR := $(KERNEL_SRC)
+KDIR := $(KDIR)
 MDIR := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 $(info -- KDIR: $(KDIR))
