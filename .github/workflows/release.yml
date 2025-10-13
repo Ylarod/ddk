@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          lfs: false
+          submodules: false
       - name: Generate matrix from mapping.json
         id: gen
         uses: actions/github-script@v7
@@ -41,12 +41,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-          lfs: false
+          submodules: false
 
     - name: Pull lfs
       run: |
-        git lfs pull --include="clang/"
-        ls -al clang/
+        GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
+        git lfs pull --include="prebuilts/clang/"
+        ls -al prebuilts/clang/
 
     - name: Build image
       run: |
@@ -76,10 +77,11 @@ jobs:
 
     - name: Pull lfs
       run: |
-        git lfs pull --include="src/src.${{ matrix.source_name }}.tar.zst"
-        git lfs pull --include="kdir/kdir.${{ matrix.source_name }}.tar.zst"
-        ls -al src/
-        ls -al kdir/
+        GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
+        git lfs pull --include="prebuilts/src/src.${{ matrix.source_name }}.tar.zst"
+        git lfs pull --include="prebuilts/kdir/kdir.${{ matrix.source_name }}.tar.zst"
+        ls -al prebuilts/src/
+        ls -al prebuilts/kdir/
 
     - name: Build image
       run: |

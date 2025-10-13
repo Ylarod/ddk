@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          lfs: false
+          submodules: false
 
       - name: Publish Features to GHCR
         uses: devcontainers/action@v1

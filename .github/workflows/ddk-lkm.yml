@@ -35,7 +35,7 @@ jobs:
     - name: Checkout source code
       uses: actions/checkout@v4
       with:
-          lfs: false
+          submodules: false
 
     - name: Build ${{ inputs.module_name }}.ko
       run: |
