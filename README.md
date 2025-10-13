@@ -10,6 +10,12 @@
 
 submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodules
 
+内核模块开发模板：
+
+[Github](https://github.com/Ylarod/ddk-module-template)
+
+[CNB](https://cnb.cool/Ylarod/ddk-module-template)
+
 ## 使用方法
 
 > [!TIP]

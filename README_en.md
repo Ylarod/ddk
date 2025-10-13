@@ -10,6 +10,8 @@ If you prefer not to download Clang, you can use NDK Clang to build, but this **
 
 Prebuilts tarball in submodule is very large，do not clone submodules if unnecessary.
 
+[ddk-module-template](https://github.com/Ylarod/ddk-module-template)
+
 ## Usage
 
 > [!TIP]
