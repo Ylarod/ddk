@@ -1,4 +1,16 @@
 {
+  "registry": {
+    "ddk": {
+      "github": "ghcr.io/ylarod/ddk",
+      "docker": "docker.io/ylarod/ddk",
+      "cnb": "docker.cnb.cool/ylarod/ddk/ddk"
+    },
+    "ddk-clang": {
+      "github": "ghcr.io/ylarod/ddk/clang",
+      "docker": "docker.io/ylarod/ddk-clang",
+      "cnb": "docker.cnb.cool/ylarod/ddk/ddk-clang"
+    }
+  },
   "clang": [
     { "version": "clang-r416183b", "branch": "master-kernel-build-2021" },
     { "version": "clang-r450784e", "branch": "master-kernel-build-2022" },

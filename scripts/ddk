@@ -3,19 +3,68 @@ set -euo pipefail
 
 prog=$(basename "$0")
 
+# Check and configure image source
+DDK_CONFIG="$HOME/.ddk"
+if [[ ! -f "$DDK_CONFIG" ]]; then
+  echo "First run detected. Please select an image source:"
+  echo "1. cnb (docker.cnb.cool/ylarod/ddk)"
+  echo "2. github (ghcr.io/ylarod/ddk)"
+  echo "3. docker (docker.io/ylarod/ddk)"
+  read -p "Enter your choice (1/2/3): " choice
+
+  case "$choice" in
+    1)
+      echo "cnb" > "$DDK_CONFIG"
+      echo "Selected: cnb source"
+      ;;
+    2)
+      echo "github" > "$DDK_CONFIG"
+      echo "Selected: github source"
+      ;;
+    3)
+      echo "docker" > "$DDK_CONFIG"
+      echo "Selected: docker source"
+      ;;
+    *)
+      echo "Invalid option, defaulting to github source" >&2
+      echo "github" > "$DDK_CONFIG"
+      ;;
+  esac
+fi
+
+# Read configured source
+SOURCE=$(cat "$DDK_CONFIG")
+case "$SOURCE" in
+  cnb)
+    IMAGE_BASE="docker.cnb.cool/ylarod/ddk"
+    ;;
+  github)
+    IMAGE_BASE="ghcr.io/ylarod/ddk"
+    ;;
+  docker)
+    IMAGE_BASE="docker.io/ylarod/ddk"
+    ;;
+  *)
+    echo "Warning: unknown source configuration '$SOURCE', using default github source" >&2
+    IMAGE_BASE="ghcr.io/ylarod/ddk"
+    ;;
+esac
+
 usage() {
   cat <<EOF
 Usage: $prog <command> [options] [-- <make-args>]
 
 Commands:
   list                                        List all pulled DDK images
-  pull [--target <target>] <target>           Pull image ghcr.io/ylarod/ddk:<target>
-  build [--target <target>] [-- <make-args>]
+  list-all                                    List all available DDK targets from repository
+  pull <target>|--target <target>             Pull image $IMAGE_BASE:<target>
+  build [<target>] [--target <target>] [-- <make-args>]
                                               Run 'make' inside container (for building)
-  clean [--target <target>]
+  clean [<target>] [--target <target>]
                                               Run 'make clean' inside container
-  shell [--target <target>]
+  shell [<target>] [--target <target>]
                                               Start an interactive shell in the container
+  update                                      Update ddk script to the latest version
 
 Options:
   --target, -t   image tag like 'android12-5.10' (defaults to DDK_TARGET env if unset)
@@ -24,10 +73,14 @@ Options:
 
 Examples:
   $prog list
+  $prog list-all
   $prog pull android12-5.10
+  $prog pull --target android12-5.10
+  $prog build android12-5.10 -- CFLAGS=-O2
   $prog build --target android12-5.10 -- CFLAGS=-O2
   $prog clean -t android12-5.10
-  $prog shell -t android12-5.10
+  $prog shell android12-5.10
+  $prog update
 EOF
 }
 
@@ -76,10 +129,88 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Handle 'list' command early since it doesn't need TARGET
+# Handle 'list', 'list-all', and 'update' commands early since they don't need TARGET
 if [[ "$cmd" == "list" ]]; then
   echo "Pulled DDK images:"
-  docker images --filter "reference=ghcr.io/ylarod/ddk" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+  docker images --filter "reference=$IMAGE_BASE" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+  exit 0
+fi
+
+if [[ "$cmd" == "list-all" ]]; then
+  # Determine mapping.json URL based on source
+  case "$SOURCE" in
+    cnb)
+      MAPPING_URL="https://cnb.cool/Ylarod/ddk/-/git/raw/main/mapping.json?download=true"
+      ;;
+    github|docker|*)
+      MAPPING_URL="https://raw.githubusercontent.com/Ylarod/ddk/main/mapping.json"
+      ;;
+  esac
+
+  echo "Fetching available targets from: $MAPPING_URL"
+  echo ""
+
+  TEMP_JSON=$(mktemp)
+  if ! curl -fsSL "$MAPPING_URL" -o "$TEMP_JSON"; then
+    rm -f "$TEMP_JSON"
+    echo "Error: failed to download mapping.json" >&2
+    exit 1
+  fi
+
+  echo "Available Targets:"
+  echo "------------------"
+
+  # Check if jq is available
+  if command -v jq &> /dev/null; then
+    jq -r '.android[] | .name' "$TEMP_JSON" | sed 's/^/  /'
+  else
+    # Fallback: simple grep-based parsing if jq is not available
+    grep -o '"name": "[^"]*"' "$TEMP_JSON" | cut -d'"' -f4 | sed 's/^/  /'
+  fi
+
+  rm -f "$TEMP_JSON"
+  exit 0
+fi
+
+if [[ "$cmd" == "update" ]]; then
+  SCRIPT_PATH=$(command -v ddk 2>/dev/null || echo "")
+  if [[ -z "$SCRIPT_PATH" ]]; then
+    echo "Error: cannot find ddk script location" >&2
+    exit 1
+  fi
+
+  SCRIPT_PATH=$(readlink -f "$SCRIPT_PATH" 2>/dev/null || realpath "$SCRIPT_PATH" 2>/dev/null || echo "$SCRIPT_PATH")
+
+  # Determine download URL based on source
+  case "$SOURCE" in
+    cnb)
+      DOWNLOAD_URL="https://cnb.cool/Ylarod/ddk/-/git/raw/main/scripts/ddk?download=true"
+      ;;
+    github|docker|*)
+      DOWNLOAD_URL="https://raw.githubusercontent.com/Ylarod/ddk/main/scripts/ddk"
+      ;;
+  esac
+
+  echo "Updating ddk script at: $SCRIPT_PATH"
+  echo "Downloading from: $DOWNLOAD_URL"
+
+  TEMP_FILE=$(mktemp)
+  if curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
+    if [[ -w "$SCRIPT_PATH" ]]; then
+      mv "$TEMP_FILE" "$SCRIPT_PATH"
+      chmod +x "$SCRIPT_PATH"
+      echo "Successfully updated ddk script"
+    else
+      echo "Need sudo permission to update $SCRIPT_PATH"
+      sudo mv "$TEMP_FILE" "$SCRIPT_PATH"
+      sudo chmod +x "$SCRIPT_PATH"
+      echo "Successfully updated ddk script"
+    fi
+  else
+    rm -f "$TEMP_FILE"
+    echo "Error: failed to download latest ddk script" >&2
+    exit 1
+  fi
   exit 0
 fi
 
@@ -94,7 +225,7 @@ if [[ -z "$TARGET" ]]; then
   fi
 fi
 
-IMAGE="ghcr.io/ylarod/ddk:${TARGET}"
+IMAGE="$IMAGE_BASE:${TARGET}"
 
 # Build docker run base args
 # Force platform to linux/amd64 to ensure consistent x86 toolchain
