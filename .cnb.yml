@@ -5,14 +5,13 @@ main:
         cpus: 4
       git:
         enable: true
-        lfs: false
+        submodules: false
       services:
         - docker
       stages:
         - name: docker build
           script: |
-            apt update && apt install -y wget jq --no-install-recommends
-            wget -O mapping.json https://cnb.cool/Ylarod/ddk/-/git/raw/main/mapping.json?download=true
+            apt update && apt install -y jq --no-install-recommends
             jq -r '.android[] | [.name] | @tsv' "mapping.json" | while IFS=$'\t' read -r name; do
               [ -n "$name" ] || continue
               echo "Building ddk-dev for Android version: $name"
@@ -25,6 +24,7 @@ main:
         cpus: 4
       git:
         enable: true
+        submodules: false
         lfs: false
       services:
         - docker
@@ -35,7 +35,8 @@ main:
             info: IMAGE_TAG
         - name: docker build
           script: |
-            git lfs pull --include="clang/"
+            GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
+            git lfs pull --include="prebuilts/clang/"
             docker buildx build --push -t $IMAGE_TAG . -f .cnb/cnb-dev/Dockerfile
   
   web_trigger_builder:
