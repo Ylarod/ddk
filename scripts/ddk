@@ -10,7 +10,17 @@ if [[ ! -f "$DDK_CONFIG" ]]; then
   echo "1. cnb (docker.cnb.cool/ylarod/ddk)"
   echo "2. github (ghcr.io/ylarod/ddk)"
   echo "3. docker (docker.io/ylarod/ddk)"
-  read -p "Enter your choice (1/2/3): " choice
+  echo ""
+  echo "Waiting 30 seconds (default: github)..."
+
+  choice=""
+  if read -t 30 -p "Enter your choice (1/2/3): " choice; then
+    echo ""
+  else
+    echo ""
+    echo "Timeout: defaulting to github source"
+    choice="2"
+  fi
 
   case "$choice" in
     1)
