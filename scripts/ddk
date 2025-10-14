@@ -7,7 +7,7 @@ prog=$(basename "$0")
 DDK_CONFIG="$HOME/.ddk"
 if [[ ! -f "$DDK_CONFIG" ]]; then
   echo "First run detected. Please select an image source:"
-  echo "1. cnb (docker.cnb.cool/ylarod/ddk)"
+  echo "1. cnb (docker.cnb.cool/ylarod/ddk/ddk)"
   echo "2. github (ghcr.io/ylarod/ddk)"
   echo "3. docker (docker.io/ylarod/ddk)"
   echo ""
@@ -46,7 +46,7 @@ fi
 SOURCE=$(cat "$DDK_CONFIG")
 case "$SOURCE" in
   cnb)
-    IMAGE_BASE="docker.cnb.cool/ylarod/ddk"
+    IMAGE_BASE="docker.cnb.cool/ylarod/ddk/ddk"
     ;;
   github)
     IMAGE_BASE="ghcr.io/ylarod/ddk"
