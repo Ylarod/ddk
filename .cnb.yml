@@ -1,3 +1,22 @@
+$:
+  vscode:
+    - name: ddk-dev
+      runner:
+        cpus: 8
+      docker:
+        image: cnbcool/default-dev-env:latest
+      git:
+        enable: true
+        submodules: false
+      services:
+        - vscode
+        - docker
+      stages:
+        - name: env check
+          script: |
+            echo "CPU cores requested: 8"
+            uname -a
+
 main:
   web_trigger_ddk_dev:
     - name: ddk-dev
