@@ -206,15 +206,17 @@ if [[ "$cmd" == "update" ]]; then
 
   TEMP_FILE=$(mktemp)
   if curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
-    if [[ -w "$SCRIPT_PATH" ]]; then
-      mv "$TEMP_FILE" "$SCRIPT_PATH"
-      chmod +x "$SCRIPT_PATH"
+    if mv "$TEMP_FILE" "$SCRIPT_PATH" 2>/dev/null && chmod 755 "$SCRIPT_PATH" 2>/dev/null; then
       echo "Successfully updated ddk script"
     else
       echo "Need sudo permission to update $SCRIPT_PATH"
-      sudo mv "$TEMP_FILE" "$SCRIPT_PATH"
-      sudo chmod +x "$SCRIPT_PATH"
-      echo "Successfully updated ddk script"
+      if sudo mv "$TEMP_FILE" "$SCRIPT_PATH" && sudo chmod 755 "$SCRIPT_PATH"; then
+        echo "Successfully updated ddk script"
+      else
+        rm -f "$TEMP_FILE"
+        echo "Error: failed to update ddk script" >&2
+        exit 1
+      fi
     fi
   else
     rm -f "$TEMP_FILE"
