@@ -114,6 +114,25 @@ export DDK_TARGET=android12-5.10
 ddk build   # Will use DDK_TARGET
 ```
 
+### Local development with ddk local mode
+
+Since make takes too long to parse the Makefilek phase when using orbstack to build kernel modules on M1 Mac, you can use local mode to develop kernel modules on the MacOS platform.
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone https://cnb.cool/Ylarod/ddk-prebuilts -b darwin
+
+cd ddk-prebuilts
+git lfs install
+git lfs pull
+./install.sh
+```
+
+Then execute ddk and you will be prompted for the mode. Just switch to local mode. or:
+
+```bash
+echo local > ~/.ddk/mode
+```
+
 ### GitHub CI
 
 Refer to the following workflow files to build:

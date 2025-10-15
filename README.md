@@ -118,6 +118,25 @@ export DDK_TARGET=android12-5.10
 ddk build   # 会使用 DDK_TARGET
 ```
 
+### 本地使用 local 模式（仅推荐 MacOS）
+
+由于在 M1 Mac 使用 orbstack 构建内核模块时，make 在解析 Makefilek 阶段时间过长，可以使用 local 模式在 MacOS 平台上开发内核模块。
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone https://cnb.cool/Ylarod/ddk-prebuilts -b darwin
+
+cd ddk-prebuilts
+git lfs install
+git lfs pull
+./install.sh
+```
+
+然后执行 ddk 会提示模式，切换到 local 模式即可。或者：
+
+```bash
+echo local > ~/.ddk/mode
+```
+
 ### Github CI
 
 参考下面的文件构建：
