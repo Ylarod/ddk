@@ -35,6 +35,7 @@ DDK_ROOT="${DDK_ROOT:-/opt/ddk}"
 DDK_MODE=""
 SOURCE=""
 IMAGE_BASE=""
+CMD=""
 TARGET=""
 MAKE_ARGS=()
 DOCKER_COMMON_ARGS=(--platform linux/amd64 --rm -v "$(pwd)":/build -w /build)
@@ -272,15 +273,13 @@ init_config() {
 
 # Parse command-line arguments and extract TARGET and MAKE_ARGS
 # Args:
-#   $1 - command name (required)
-#   $@ - remaining command-line arguments
+#   $@ - command and arguments (first arg is command name)
 # Sets globals:
+#   CMD - the command name (e.g., build, clean, shell)
 #   TARGET - the build target (e.g., android12-5.10)
 #   MAKE_ARGS - array of additional make arguments
-# Returns:
-#   Echoes the command name for the caller
 parse_args() {
-  local cmd=$1
+  CMD=$1
   shift
 
   TARGET=""
@@ -316,8 +315,6 @@ parse_args() {
         ;;
     esac
   done
-
-  echo "$cmd"
 }
 
 # ============================================================================
@@ -442,7 +439,7 @@ setup_local_env() {
   export DDK_ORIGINAL_PATH="$PATH"
 
   # Setup DDK environment
-  export KDIR="$DDK_ROOT/src/$target"
+  export KDIR="$DDK_ROOT/kdir/$target"
   export CLANG_PATH="$DDK_ROOT/clang/$clang/bin"
   export PATH="$CLANG_PATH:$PATH"
   export CROSS_COMPILE=aarch64-linux-gnu-
@@ -664,23 +661,29 @@ update_self() {
   local temp_file
   temp_file=$(mktemp)
   # Setup trap to cleanup temp file on exit/interrupt
-  trap 'rm -f "$temp_file"' RETURN EXIT INT TERM
+  trap 'rm -f "$temp_file"' INT TERM
 
   if curl -fsSL "$download_url" -o "$temp_file"; then
     if mv -f "$temp_file" "$script_path" 2>/dev/null && chmod 755 "$script_path" 2>/dev/null; then
       echo "Successfully updated ddk script"
+      trap - INT TERM  # Clear trap on success
       return 0
     else
       echo "Need sudo permission to update $script_path"
       if sudo mv -f "$temp_file" "$script_path" && sudo chmod 755 "$script_path"; then
         echo "Successfully updated ddk script"
+        trap - INT TERM  # Clear trap on success
         return 0
       else
+        rm -f "$temp_file"
+        trap - INT TERM  # Clear trap on failure
         echo "Error: failed to update ddk script" >&2
         return 1
       fi
     fi
   else
+    rm -f "$temp_file"
+    trap - INT TERM  # Clear trap on failure
     echo "Error: failed to download latest ddk script" >&2
     return 1
   fi
@@ -787,11 +790,10 @@ main() {
   init_config
 
   # Parse command and arguments
-  local cmd
-  cmd=$(parse_args "$@")
+  parse_args "$@"
 
   # Handle commands that don't need TARGET
-  case "$cmd" in
+  case "$CMD" in
     list)
       cmd_list
       exit 0
@@ -819,7 +821,7 @@ main() {
   fi
 
   # Handle commands that need TARGET
-  case "$cmd" in
+  case "$CMD" in
     pull)
       cmd_pull
       ;;
@@ -833,7 +835,7 @@ main() {
       cmd_shell
       ;;
     *)
-      echo "Unknown command: $cmd" >&2
+      echo "Unknown command: $CMD" >&2
       usage
       exit 2
       ;;
