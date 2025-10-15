@@ -667,12 +667,12 @@ update_self() {
   trap 'rm -f "$temp_file"' RETURN EXIT INT TERM
 
   if curl -fsSL "$download_url" -o "$temp_file"; then
-    if mv "$temp_file" "$script_path" 2>/dev/null && chmod 755 "$script_path" 2>/dev/null; then
+    if mv -f "$temp_file" "$script_path" 2>/dev/null && chmod 755 "$script_path" 2>/dev/null; then
       echo "Successfully updated ddk script"
       return 0
     else
       echo "Need sudo permission to update $script_path"
-      if sudo mv "$temp_file" "$script_path" && sudo chmod 755 "$script_path"; then
+      if sudo mv -f "$temp_file" "$script_path" && sudo chmod 755 "$script_path"; then
         echo "Successfully updated ddk script"
         return 0
       else
