@@ -541,7 +541,7 @@ local_shell() {
   clang=$(get_clang_for_target "$TARGET")
 
   # Setup environment variables for the subshell
-  export KDIR="$DDK_ROOT/src/$TARGET"
+  export KDIR="$DDK_ROOT/kdir/$TARGET"
   export CLANG_PATH="$DDK_ROOT/clang/$clang/bin"
   export PATH="$CLANG_PATH:$PATH"
   export CROSS_COMPILE=aarch64-linux-gnu-
