@@ -4,7 +4,25 @@ set -euo pipefail
 prog=$(basename "$0")
 
 # Check and configure image source
-DDK_CONFIG="$HOME/.ddk"
+DDK_CONFIG_DIR="$HOME/.ddk"
+DDK_CONFIG="$DDK_CONFIG_DIR/source"
+
+# Migration: if ~/.ddk is a file, migrate to directory structure
+if [[ -f "$DDK_CONFIG_DIR" && ! -L "$DDK_CONFIG_DIR" ]]; then
+  echo "Migrating configuration from file to directory structure..."
+  OLD_SOURCE=$(cat "$DDK_CONFIG_DIR")
+  rm -f "$DDK_CONFIG_DIR"
+  mkdir -p "$DDK_CONFIG_DIR"
+  echo "$OLD_SOURCE" > "$DDK_CONFIG"
+  echo "Migration completed: $DDK_CONFIG_DIR is now a directory"
+fi
+
+# Ensure config directory exists
+if [[ ! -d "$DDK_CONFIG_DIR" ]]; then
+  mkdir -p "$DDK_CONFIG_DIR"
+fi
+
+# Initialize config if not exists
 if [[ ! -f "$DDK_CONFIG" ]]; then
   echo "First run detected. Please select an image source:"
   echo "1. cnb (docker.cnb.cool/ylarod/ddk/ddk)"
