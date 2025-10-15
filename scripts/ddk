@@ -539,13 +539,12 @@ local_shell() {
   echo "Starting interactive shell for target: $TARGET"
   echo ""
 
-  local target=$1
   local clang
 
-  clang=$(get_clang_for_target "$target")
+  clang=$(get_clang_for_target "$TARGET")
 
   # Setup environment variables for the subshell
-  export KDIR="$DDK_ROOT/src/$target"
+  export KDIR="$DDK_ROOT/src/$TARGET"
   export CLANG_PATH="$DDK_ROOT/clang/$clang/bin"
   export PATH="$CLANG_PATH:$PATH"
   export CROSS_COMPILE=aarch64-linux-gnu-
@@ -758,7 +757,7 @@ cmd_clean() {
 
 cmd_shell() {
   if [[ "$DDK_MODE" == "local" ]]; then
-    local_shell "$TARGET"
+    local_shell
     return
   fi
 
