@@ -26,13 +26,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends skopeo jq
 
-      - name: Login to GHCR
-        env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "$GHCR_USER" --password-stdin
-
       - name: Login to Docker Hub
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
