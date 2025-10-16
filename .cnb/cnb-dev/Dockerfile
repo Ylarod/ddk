@@ -19,7 +19,7 @@ RUN --mount=type=bind,source=prebuilts/clang,target=/mnt/clang,readonly \
       [ -e "$f" ] || continue; \
       name="$(basename "$f")"; \
       version="${name%.tar.zst}"; \
-      dest="/opt/ddk/clang/$version"; \
+      dest="/opt/ddk/clang/"; \
       if [ ! -d "$dest" ] || [ -z "$(ls -A "$dest" 2>/dev/null || true)" ]; then \
         echo "[+] Importing $version from $name"; \
         mkdir -p "$dest"; \
