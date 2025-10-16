@@ -2,6 +2,11 @@ name: sync-image
 
 on:
   workflow_dispatch:
+    inputs:
+      date:
+        description: "可选：附加版本日期（例如 20251016），将额外同步 tag-<date>"
+        required: false
+        default: ""
 
 jobs:
   sync:
@@ -26,6 +31,12 @@ jobs:
           # 固定使用 cnb 作为源
           src_key="cnb"
           echo "使用源: ${src_key}"
+          date_input='${{ github.event.inputs.date }}'
+          if [ -n "$date_input" ]; then
+            echo "使用日期后缀: $date_input"
+          else
+            echo "未指定日期后缀"
+          fi
           # 读取 registry 映射
           ghcr_repo=$(jq -r '.registry["ddk"].github' mapping.json)
           docker_repo=$(jq -r '.registry["ddk"].docker' mapping.json)
@@ -37,18 +48,34 @@ jobs:
           # 选择源
           src_ddk="$cnb_repo"; src_clang="$cnb_clang_repo"
 
-          # 组合版本矩阵：每个 matrix 元素包含三元组：name, src, ghcr, docker
-          # ddk 主镜像（无额外标签，仅 latest）
-          echo "[INFO] 生成 ddk 基础镜像条目"
-          base_matrix=$(jq -n \
-            --arg name "ddk:latest" \
-            --arg src  "$src_ddk:latest" \
-            --arg ghcr "$ghcr_repo:latest" \
-            --arg dock "$docker_repo:latest" \
-            '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+          # 组合版本矩阵：每个元素包含：name, src, ghcr, docker
+          # ddk 标签：来自 mapping.json.android[].name
+          echo "[INFO] 从 mapping.json 收集 ddk 标签"
+          ddk_tags=$(jq -r '.android[].name' mapping.json)
+          ddk_matrix="[]"
+          for tag in $ddk_tags; do
+            item=$(jq -n \
+              --arg name "ddk:$tag" \
+              --arg src  "$src_ddk:$tag" \
+              --arg ghcr "$ghcr_repo:$tag" \
+              --arg dock "$docker_repo:$tag" \
+              '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+            ddk_matrix=$(jq -c --argjson it "$item" '. + [$it]' <<< "$ddk_matrix")
 
-          # ddk-clang 带标签矩阵
-          echo "[INFO] 生成 ddk-clang 镜像条目"
+            # 若指定日期，则添加额外的日期标签项（源使用原标签，目标标签追加 -$date）
+            if [ -n "$date_input" ]; then
+              item_date=$(jq -n \
+                --arg name "ddk:${tag}-$date_input" \
+                --arg src  "$src_ddk:$tag" \
+                --arg ghcr "$ghcr_repo:${tag}-$date_input" \
+                --arg dock "$docker_repo:${tag}-$date_input" \
+                '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+              ddk_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$ddk_matrix")
+            fi
+          done
+
+          # ddk-clang 标签：来自 mapping.json.clang[].version
+          echo "[INFO] 从 mapping.json 收集 ddk-clang 标签"
           clang_tags=$(jq -r '.clang[].version' mapping.json)
           clang_matrix="[]"
           for tag in $clang_tags; do
@@ -59,11 +86,22 @@ jobs:
               --arg dock "$docker_clang_repo:$tag" \
               '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
             clang_matrix=$(jq -c --argjson it "$item" '. + [$it]' <<< "$clang_matrix")
+
+            if [ -n "$date_input" ]; then
+              item_date=$(jq -n \
+                --arg name "ddk-clang:${tag}-$date_input" \
+                --arg src  "$src_clang:$tag" \
+                --arg ghcr "$ghcr_clang_repo:${tag}-$date_input" \
+                --arg dock "$docker_clang_repo:${tag}-$date_input" \
+                '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+              clang_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$clang_matrix")
+            fi
           done
 
-          full_matrix=$(jq -c --argjson base "$base_matrix" --argjson clang "$clang_matrix" '[ $base ] + $clang')
+          full_matrix=$(jq -c --argjson ddk "$ddk_matrix" --argjson clang "$clang_matrix" '$ddk + $clang')
           echo "matrix=$full_matrix" >> $GITHUB_OUTPUT
-          echo "将要同步的镜像: $full_matrix"
+          echo "将要同步的镜像 (共 $(echo "$full_matrix" | jq 'length') 个):" | tee -a $GITHUB_STEP_SUMMARY
+          echo "$full_matrix" | jq -r '.[] | "- " + .name + " ← " + .src' | tee -a $GITHUB_STEP_SUMMARY
 
       - name: Login to GHCR
         if: always()
