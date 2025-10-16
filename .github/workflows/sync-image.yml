@@ -1,0 +1,117 @@
+name: sync-image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync images from CNB to GHCR & Docker Hub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo jq
+
+      - name: Parse mapping.json → build matrix
+        id: gen
+        run: |
+          set -euo pipefail
+          # 固定使用 cnb 作为源
+          src_key="cnb"
+          echo "使用源: ${src_key}"
+          # 读取 registry 映射
+          ghcr_repo=$(jq -r '.registry["ddk"].github' mapping.json)
+          docker_repo=$(jq -r '.registry["ddk"].docker' mapping.json)
+          cnb_repo=$(jq -r '.registry["ddk"].cnb' mapping.json)
+          ghcr_clang_repo=$(jq -r '.registry["ddk-clang"].github' mapping.json)
+          docker_clang_repo=$(jq -r '.registry["ddk-clang"].docker' mapping.json)
+          cnb_clang_repo=$(jq -r '.registry["ddk-clang"].cnb' mapping.json)
+
+          # 选择源
+          src_ddk="$cnb_repo"; src_clang="$cnb_clang_repo"
+
+          # 组合版本矩阵：每个 matrix 元素包含三元组：name, src, ghcr, docker
+          # ddk 主镜像（无额外标签，仅 latest）
+          echo "[INFO] 生成 ddk 基础镜像条目"
+          base_matrix=$(jq -n \
+            --arg name "ddk:latest" \
+            --arg src  "$src_ddk:latest" \
+            --arg ghcr "$ghcr_repo:latest" \
+            --arg dock "$docker_repo:latest" \
+            '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+
+          # ddk-clang 带标签矩阵
+          echo "[INFO] 生成 ddk-clang 镜像条目"
+          clang_tags=$(jq -r '.clang[].version' mapping.json)
+          clang_matrix="[]"
+          for tag in $clang_tags; do
+            item=$(jq -n \
+              --arg name "ddk-clang:$tag" \
+              --arg src  "$src_clang:$tag" \
+              --arg ghcr "$ghcr_clang_repo:$tag" \
+              --arg dock "$docker_clang_repo:$tag" \
+              '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+            clang_matrix=$(jq -c --argjson it "$item" '. + [$it]' <<< "$clang_matrix")
+          done
+
+          full_matrix=$(jq -c --argjson base "$base_matrix" --argjson clang "$clang_matrix" '[ $base ] + $clang')
+          echo "matrix=$full_matrix" >> $GITHUB_OUTPUT
+          echo "将要同步的镜像: $full_matrix"
+
+      - name: Login to GHCR
+        if: always()
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "$GHCR_USER" --password-stdin
+
+      - name: Login to Docker Hub
+        if: always()
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_PASS}" ]; then
+            echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
+          else
+            echo "[WARN] 未配置 Docker Hub 凭据，跳过登录"
+          fi
+
+      - name: Sync images
+        env:
+          MATRIX: ${{ steps.gen.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          echo "$MATRIX" | jq -c '.[]' | while read -r item; do
+            name=$(jq -r '.name' <<< "$item")
+            src=$(jq -r '.src' <<< "$item")
+            dst_ghcr=$(jq -r '.ghcr' <<< "$item")
+            dst_dock=$(jq -r '.docker' <<< "$item")
+
+            echo "=== 同步 $name ==="
+            echo "源: $src"
+            echo "→ GHCR: $dst_ghcr"
+            echo "→ Docker: $dst_dock"
+
+            # 同步到 GHCR
+            skopeo copy --all docker://$src docker://$dst_ghcr
+
+            # 同步到 Docker Hub（若已登录）
+            if skopeo login --get-login docker.io >/dev/null 2>&1; then
+              skopeo copy --all docker://$src docker://$dst_dock
+            else
+              echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock"
+            fi
+          done
+
+      - name: Summary
+        run: |
+          echo "同步完成。源 → GHCR 与（可选）Docker Hub。" >> $GITHUB_STEP_SUMMARY
