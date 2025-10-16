@@ -57,25 +57,31 @@ jobs:
           echo "ddk 标签数量: $ddk_count"
           ddk_matrix="[]"
           jq -r '.android[].name' mapping.json | while read -r tag; do
+            echo "[DEBUG] ddk tag: $tag"
             item=$(jq -n \
               --arg name "ddk:$tag" \
               --arg src  "$src_ddk:$tag" \
               --arg ghcr "$ghcr_repo:$tag" \
               --arg dock "$docker_repo:$tag" \
               '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+            echo "[DEBUG] item: $item"
             ddk_matrix=$(jq -c --argjson it "$item" '. + [$it]' <<< "$ddk_matrix")
 
             # 若指定日期，则添加额外的日期标签项（源使用原标签，目标标签追加 -$date）
             if [ -n "$date_input" ]; then
+              echo "[DEBUG] ddk tag with date: ${tag}-$date_input"
               item_date=$(jq -n \
                 --arg name "ddk:${tag}-$date_input" \
                 --arg src  "$src_ddk:$tag" \
                 --arg ghcr "$ghcr_repo:${tag}-$date_input" \
                 --arg dock "$docker_repo:${tag}-$date_input" \
                 '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+              echo "[DEBUG] item_date: $item_date"
               ddk_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$ddk_matrix")
             fi
           done
+          echo "[DEBUG] ddk_matrix count: $(echo "$ddk_matrix" | jq -r 'length // 0')"
+          echo "$ddk_matrix" | jq -r '.[0:5] | .[] | "  • " + .name' || true
 
           # ddk-clang 标签：来自 mapping.json.clang[].version
           echo "[INFO] 从 mapping.json 收集 ddk-clang 标签"
@@ -83,32 +89,48 @@ jobs:
           echo "ddk-clang 标签数量: $clang_count"
           clang_matrix="[]"
           jq -r '.clang[].version' mapping.json | while read -r tag; do
+            echo "[DEBUG] clang tag: $tag"
             item=$(jq -n \
               --arg name "ddk-clang:$tag" \
               --arg src  "$src_clang:$tag" \
               --arg ghcr "$ghcr_clang_repo:$tag" \
               --arg dock "$docker_clang_repo:$tag" \
               '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+            echo "[DEBUG] item: $item"
             clang_matrix=$(jq -c --argjson it "$item" '. + [$it]' <<< "$clang_matrix")
 
             if [ -n "$date_input" ]; then
+              echo "[DEBUG] clang tag with date: ${tag}-$date_input"
               item_date=$(jq -n \
                 --arg name "ddk-clang:${tag}-$date_input" \
                 --arg src  "$src_clang:$tag" \
                 --arg ghcr "$ghcr_clang_repo:${tag}-$date_input" \
                 --arg dock "$docker_clang_repo:${tag}-$date_input" \
                 '{name:$name, src:$src, ghcr:$ghcr, docker:$dock}')
+              echo "[DEBUG] item_date: $item_date"
               clang_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$clang_matrix")
             fi
           done
+          echo "[DEBUG] clang_matrix count: $(echo "$clang_matrix" | jq -r 'length // 0')"
+          echo "$clang_matrix" | jq -r '.[0:5] | .[] | "  • " + .name' || true
 
           full_matrix=$(jq -c --argjson ddk "$ddk_matrix" --argjson clang "$clang_matrix" '$ddk + $clang')
+          echo "[DEBUG] full_matrix count: $(echo "$full_matrix" | jq -r 'length // 0')"
+          echo "$full_matrix" | jq -r '.[0:5] | .[] | "  • " + .name + " ← " + .src' || true
           echo "matrix=$full_matrix" >> $GITHUB_OUTPUT
-          count=$(echo "$full_matrix" | jq 'length')
+          count=$(echo "$full_matrix" | jq -r 'length // 0' 2>/dev/null || echo 0)
+          # 兜底防止空值
+          case "$count" in
+            ''|*[!0-9]*) count=0 ;;
+          esac
           echo "将要同步的镜像 (共 ${count} 个):" | tee -a $GITHUB_STEP_SUMMARY
-          echo "$full_matrix" | jq -r '.[0:10] | .[] | "- " + .name + " ← " + .src' | tee -a $GITHUB_STEP_SUMMARY
-          if [ "$count" -gt 10 ]; then
-            echo "... 共 ${count} 条，以上仅展示前 10 条" | tee -a $GITHUB_STEP_SUMMARY
+          if [ "$count" -gt 0 ] 2>/dev/null; then
+            echo "$full_matrix" | jq -r '.[0:10] | .[] | "- " + .name + " ← " + .src' | tee -a $GITHUB_STEP_SUMMARY
+            if [ "$count" -gt 10 ] 2>/dev/null; then
+              echo "... 共 ${count} 条，以上仅展示前 10 条" | tee -a $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "(暂无条目)" | tee -a $GITHUB_STEP_SUMMARY
           fi
 
       - name: Login to GHCR
