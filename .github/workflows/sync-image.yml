@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: Setup skopeo
         run: |
@@ -51,9 +53,10 @@ jobs:
           # 组合版本矩阵：每个元素包含：name, src, ghcr, docker
           # ddk 标签：来自 mapping.json.android[].name
           echo "[INFO] 从 mapping.json 收集 ddk 标签"
-          ddk_tags=$(jq -r '.android[].name' mapping.json)
+          ddk_count=$(jq -r '.android | length' mapping.json)
+          echo "ddk 标签数量: $ddk_count"
           ddk_matrix="[]"
-          for tag in $ddk_tags; do
+          jq -r '.android[].name' mapping.json | while read -r tag; do
             item=$(jq -n \
               --arg name "ddk:$tag" \
               --arg src  "$src_ddk:$tag" \
@@ -76,9 +79,10 @@ jobs:
 
           # ddk-clang 标签：来自 mapping.json.clang[].version
           echo "[INFO] 从 mapping.json 收集 ddk-clang 标签"
-          clang_tags=$(jq -r '.clang[].version' mapping.json)
+          clang_count=$(jq -r '.clang | length' mapping.json)
+          echo "ddk-clang 标签数量: $clang_count"
           clang_matrix="[]"
-          for tag in $clang_tags; do
+          jq -r '.clang[].version' mapping.json | while read -r tag; do
             item=$(jq -n \
               --arg name "ddk-clang:$tag" \
               --arg src  "$src_clang:$tag" \
@@ -100,8 +104,12 @@ jobs:
 
           full_matrix=$(jq -c --argjson ddk "$ddk_matrix" --argjson clang "$clang_matrix" '$ddk + $clang')
           echo "matrix=$full_matrix" >> $GITHUB_OUTPUT
-          echo "将要同步的镜像 (共 $(echo "$full_matrix" | jq 'length') 个):" | tee -a $GITHUB_STEP_SUMMARY
-          echo "$full_matrix" | jq -r '.[] | "- " + .name + " ← " + .src' | tee -a $GITHUB_STEP_SUMMARY
+          count=$(echo "$full_matrix" | jq 'length')
+          echo "将要同步的镜像 (共 ${count} 个):" | tee -a $GITHUB_STEP_SUMMARY
+          echo "$full_matrix" | jq -r '.[0:10] | .[] | "- " + .name + " ← " + .src' | tee -a $GITHUB_STEP_SUMMARY
+          if [ "$count" -gt 10 ]; then
+            echo "... 共 ${count} 条，以上仅展示前 10 条" | tee -a $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Login to GHCR
         if: always()
