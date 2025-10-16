@@ -56,7 +56,7 @@ jobs:
           ddk_count=$(jq -r '.android | length' mapping.json)
           echo "ddk 标签数量: $ddk_count"
           ddk_matrix="[]"
-          jq -r '.android[].name' mapping.json | while read -r tag; do
+          while read -r tag; do
             echo "[DEBUG] ddk tag: $tag"
             item=$(jq -n \
               --arg name "ddk:$tag" \
@@ -79,7 +79,7 @@ jobs:
               echo "[DEBUG] item_date: $item_date"
               ddk_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$ddk_matrix")
             fi
-          done
+          done < <(jq -r '.android[].name' mapping.json)
           echo "[DEBUG] ddk_matrix count: $(echo "$ddk_matrix" | jq -r 'length // 0')"
           echo "$ddk_matrix" | jq -r '.[0:5] | .[] | "  • " + .name' || true
 
@@ -88,7 +88,7 @@ jobs:
           clang_count=$(jq -r '.clang | length' mapping.json)
           echo "ddk-clang 标签数量: $clang_count"
           clang_matrix="[]"
-          jq -r '.clang[].version' mapping.json | while read -r tag; do
+          while read -r tag; do
             echo "[DEBUG] clang tag: $tag"
             item=$(jq -n \
               --arg name "ddk-clang:$tag" \
@@ -110,7 +110,7 @@ jobs:
               echo "[DEBUG] item_date: $item_date"
               clang_matrix=$(jq -c --argjson it "$item_date" '. + [$it]' <<< "$clang_matrix")
             fi
-          done
+          done < <(jq -r '.clang[].version' mapping.json)
           echo "[DEBUG] clang_matrix count: $(echo "$clang_matrix" | jq -r 'length // 0')"
           echo "$clang_matrix" | jq -r '.[0:5] | .[] | "  • " + .name' || true
 
@@ -158,7 +158,7 @@ jobs:
           MATRIX: ${{ steps.gen.outputs.matrix }}
         run: |
           set -euo pipefail
-          echo "$MATRIX" | jq -c '.[]' | while read -r item; do
+          while read -r item; do
             name=$(jq -r '.name' <<< "$item")
             src=$(jq -r '.src' <<< "$item")
             dst_ghcr=$(jq -r '.ghcr' <<< "$item")
@@ -173,12 +173,12 @@ jobs:
             skopeo copy --all docker://$src docker://$dst_ghcr
 
             # 同步到 Docker Hub（若已登录）
-            if skopeo login --get-login docker.io >/dev/null 2>&1; then
+            if skopeo login --get-login docker.io >/devnull 2>&1; then
               skopeo copy --all docker://$src docker://$dst_dock
             else
               echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock"
             fi
-          done
+          done < <(echo "$MATRIX" | jq -c '.[]')
 
       - name: Summary
         run: |
