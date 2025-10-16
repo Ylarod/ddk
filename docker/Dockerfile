@@ -1,5 +1,5 @@
 ARG CLANG_VER
-FROM ghcr.io/ylarod/ddk/clang:${CLANG_VER}
+FROM docker.cnb.cool/ylarod/ddk/ddk-clang:${CLANG_VER}
 ARG CLANG_VER
 
 WORKDIR /opt/ddk
@@ -30,8 +30,8 @@ LABEL org.opencontainers.image.title="DDK ${ANDROID_VER}" \
       io.ddk.clang.version="${CLANG_VER}" \
       io.ddk.kernel.src="${ANDROID_VER}"
 
-RUN --mount=type=bind,source=src/src.${ANDROID_VER}.tar.zst,target=/tmp/src.tar.zst,readonly \
-    --mount=type=bind,source=kdir/kdir.${ANDROID_VER}.tar.zst,target=/tmp/kdir.tar.zst,readonly \
+RUN --mount=type=bind,source=./prebuilts/src/src.${ANDROID_VER}.tar.zst,target=/tmp/src.tar.zst,readonly \
+    --mount=type=bind,source=./prebuilts/kdir/kdir.${ANDROID_VER}.tar.zst,target=/tmp/kdir.tar.zst,readonly \
     mkdir -p /opt/ddk/src/ /opt/ddk/kdir/; \
     tar -xf /tmp/src.tar.zst -C /opt/ddk/src/; \
     tar -xf /tmp/kdir.tar.zst -C /opt/ddk/kdir/;

@@ -10,7 +10,9 @@ endif
 
 MATRIX := $(shell jq -r '.matrix[] | "\(.android):\(.clang)"' $(ROOT)/mapping.json | tr '\n' ' ')
 
-REG ?= ghcr.io/ylarod
+# ghcr.io/ylarod
+# docker.cnb.cool/ylarod/ddk
+REG ?= docker.cnb.cool/ylarod/ddk
 IMG ?= ddk
 PUSH ?= 0
 FORCE ?= 0
