@@ -365,7 +365,7 @@ local_list() {
     # Both exist - available target
     if $src_exists && $clang_exists; then
       echo "  $android ✓ (src: ✓, clang: ✓)"
-      ((available_count++))
+      available_count=$((available_count + 1))
     # Only one exists - incomplete
     elif $src_exists || $clang_exists; then
       local src_mark="✗"
@@ -373,7 +373,7 @@ local_list() {
       $src_exists && src_mark="✓"
       $clang_exists && clang_mark="✓"
       echo "  $android ✗ (src: $src_mark, clang: $clang_mark)"
-      ((incomplete_count++))
+      incomplete_count=$((incomplete_count + 1))
     fi
     # Both don't exist - skip (no output)
   done
