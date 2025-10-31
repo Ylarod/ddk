@@ -18,10 +18,16 @@ set -euo pipefail
 #   ~/.ddk/source  - Image source (cnb/github/docker)
 #   ~/.ddk/mode    - Run mode (local/docker)
 #   ~/.ddk/mapping.json - Target to clang version mapping
+#   .ddk-version   - Project-level target version (in project directory)
 #
 # Environment Variables:
 #   DDK_ROOT   - Local DDK installation path (default: /opt/ddk)
 #   DDK_TARGET - Default build target
+#
+# Target Resolution Priority:
+#   1. Command line argument (--target or positional)
+#   2. .ddk-version file in current directory
+#   3. DDK_TARGET environment variable
 #
 # ============================================================================
 # Global Variables
@@ -72,9 +78,15 @@ Commands:
   update                                      Update ddk script to the latest version
 
 Options:
-  --target, -t   image tag like 'android12-5.10' (defaults to DDK_TARGET env if unset)
+  --target, -t   image tag like 'android12-5.10'
+                 (Priority: command arg > .ddk-version file > DDK_TARGET env)
   (docker platform is forced to linux/amd64)
   -h, --help     show this help
+
+Target Resolution:
+  1. Command line argument (--target or positional)
+  2. .ddk-version file in current directory
+  3. DDK_TARGET environment variable
 
 Examples:
   $prog list
@@ -87,6 +99,11 @@ Examples:
   $prog compdb android12-5.10
   $prog shell android12-5.10
   $prog update
+
+  # Using .ddk-version file:
+  echo "android12-5.10" > .ddk-version
+  $prog build    # Will use android12-5.10 from .ddk-version
+  $prog clean    # Will use android12-5.10 from .ddk-version
 EOF
 }
 
@@ -268,6 +285,32 @@ init_config() {
   configure_mode
   configure_source
   ensure_mapping_json
+}
+
+# ============================================================================
+# Target Resolution Functions
+# ============================================================================
+
+# Read target from .ddk-version file in current directory
+# Returns:
+#   Echoes the target string if file exists and is valid
+#   Echoes empty string if file doesn't exist or is empty
+get_target_from_version_file() {
+  local version_file=".ddk-version"
+
+  if [[ -f "$version_file" ]]; then
+    # Read and trim whitespace
+    local target
+    target=$(cat "$version_file" | tr -d '[:space:]')
+
+    if [[ -n "$target" ]]; then
+      echo "$target"
+      return 0
+    fi
+  fi
+
+  echo ""
+  return 0
 }
 
 # ============================================================================
@@ -896,11 +939,19 @@ main() {
 
   # Validate TARGET for commands that need it
   if [[ -z "$TARGET" ]]; then
-    # Try environment variable fallback
-    if [[ -n "${DDK_TARGET:-}" ]]; then
+    # Try .ddk-version file first
+    local version_file_target
+    version_file_target=$(get_target_from_version_file)
+    if [[ -n "$version_file_target" ]]; then
+      TARGET="$version_file_target"
+      echo "Using target from .ddk-version: $TARGET"
+    # Then try environment variable fallback
+    elif [[ -n "${DDK_TARGET:-}" ]]; then
       TARGET="$DDK_TARGET"
+      echo "Using target from DDK_TARGET: $TARGET"
     else
-      echo "Error: target is required. Use --target or provide it as the first positional argument, or set DDK_TARGET." >&2
+      echo "Error: target is required. Use --target or provide it as the first positional argument," >&2
+      echo "       or create a .ddk-version file, or set DDK_TARGET environment variable." >&2
       usage
       exit 2
     fi
