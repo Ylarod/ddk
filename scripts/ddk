@@ -65,6 +65,8 @@ Commands:
                                               Run 'make' inside container (for building)
   clean [<target>] [--target <target>]
                                               Run 'make clean' inside container
+  compdb [<target>] [--target <target>]
+                                              Run 'make compdb' and update VSCode clangd settings
   shell [<target>] [--target <target>]
                                               Start an interactive shell in the container
   update                                      Update ddk script to the latest version
@@ -82,6 +84,7 @@ Examples:
   $prog build android12-5.10 -- CFLAGS=-O2
   $prog build --target android12-5.10 -- CFLAGS=-O2
   $prog clean -t android12-5.10
+  $prog compdb android12-5.10
   $prog shell android12-5.10
   $prog update
 EOF
@@ -532,6 +535,78 @@ local_clean() {
   fi
 }
 
+local_compdb() {
+  echo "Generating compilation database for target: $TARGET"
+  echo ""
+
+  local clang
+  clang=$(get_clang_for_target "$TARGET")
+
+  setup_local_env "$TARGET"
+
+  echo "Running make compdb..."
+  make compdb
+
+  local compdb_result=$?
+  restore_local_env
+
+  if [[ $compdb_result -ne 0 ]]; then
+    echo ""
+    echo "Compilation database generation failed with exit code $compdb_result" >&2
+    exit $compdb_result
+  fi
+
+  echo ""
+  echo "Compilation database generated successfully"
+
+  # Update .vscode/settings.json
+  local vscode_dir=".vscode"
+  local settings_file="$vscode_dir/settings.json"
+  local clangd_path="/opt/ddk/clang/$clang/bin/clangd"
+
+  echo "Updating VSCode settings..."
+
+  # Create .vscode directory if it doesn't exist
+  if [[ ! -d "$vscode_dir" ]]; then
+    echo "Creating $vscode_dir directory..."
+    mkdir -p "$vscode_dir"
+  fi
+
+  # Update or create settings.json
+  if [[ -f "$settings_file" ]]; then
+    # File exists, update it
+    if command -v jq &> /dev/null; then
+      # Use jq if available for proper JSON manipulation
+      local temp_file
+      temp_file=$(mktemp)
+      jq --arg path "$clangd_path" '.["clangd.path"] = $path' "$settings_file" > "$temp_file" && mv "$temp_file" "$settings_file"
+      echo "Updated clangd.path in $settings_file"
+    else
+      # Fallback: simple sed-based update
+      if grep -q '"clangd.path"' "$settings_file"; then
+        sed -i "s|\"clangd.path\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"clangd.path\": \"$clangd_path\"|g" "$settings_file"
+        echo "Updated clangd.path in $settings_file"
+      else
+        # Add clangd.path entry before the closing brace
+        sed -i "s|}$|,\n  \"clangd.path\": \"$clangd_path\"\n}|" "$settings_file"
+        echo "Added clangd.path to $settings_file"
+      fi
+    fi
+  else
+    # File doesn't exist, create new one
+    cat > "$settings_file" <<EOF
+{
+  "clangd.path": "$clangd_path"
+}
+EOF
+    echo "Created $settings_file with clangd.path"
+  fi
+
+  echo ""
+  echo "VSCode clangd settings updated: clangd.path = $clangd_path"
+  echo "Compilation database setup completed successfully"
+}
+
 local_shell() {
   echo "Starting interactive shell for target: $TARGET"
   echo ""
@@ -758,6 +833,17 @@ cmd_clean() {
   IMAGE="$image" run_docker -- make clean
 }
 
+cmd_compdb() {
+  if [[ "$DDK_MODE" == "local" ]]; then
+    local_compdb
+    return
+  fi
+
+  local image="$IMAGE_BASE:${TARGET}"
+  echo "Generating compilation database in container: $image"
+  IMAGE="$image" run_docker -- make compdb
+}
+
 cmd_shell() {
   if [[ "$DDK_MODE" == "local" ]]; then
     local_shell
@@ -830,6 +916,9 @@ main() {
       ;;
     clean)
       cmd_clean
+      ;;
+    compdb)
+      cmd_compdb
       ;;
     shell)
       cmd_shell
