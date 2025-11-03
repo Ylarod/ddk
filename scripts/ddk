@@ -44,6 +44,7 @@ IMAGE_BASE=""
 CMD=""
 TARGET=""
 MAKE_ARGS=()
+ENV_VARS=()
 DOCKER_COMMON_ARGS=(--platform linux/amd64 --rm -v "$(pwd)":/build -w /build)
 
 # ============================================================================
@@ -80,6 +81,8 @@ Commands:
 Options:
   --target, -t   image tag like 'android12-5.10'
                  (Priority: command arg > .ddk-version file > DDK_TARGET env)
+  --env, -e      pass environment variable (can be used multiple times)
+                 Example: --env CONFIG_FOO=y -e CONFIG_BAR=n
   (docker platform is forced to linux/amd64)
   -h, --help     show this help
 
@@ -99,6 +102,10 @@ Examples:
   $prog compdb android12-5.10
   $prog shell android12-5.10
   $prog update
+
+  # Using environment variables:
+  $prog build android12-5.10 --env CONFIG_FOO=y -e CONFIG_BAR=n
+  $prog shell -t android12-5.10 --env DEBUG=1
 
   # Using .ddk-version file:
   echo "android12-5.10" > .ddk-version
@@ -330,12 +337,15 @@ parse_args() {
 
   TARGET=""
   MAKE_ARGS=()
+  ENV_VARS=()
 
   # Simple flag/positional parser
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --target|-t)
         TARGET="$2"; shift 2;;
+      --env|-e)
+        ENV_VARS+=("$2"); shift 2;;
       --help|-h)
         usage
         exit 0
@@ -504,10 +514,21 @@ setup_local_env() {
     exit 1
   fi
 
+  # Export user-defined environment variables
+  for env_var in "${ENV_VARS[@]}"; do
+    export "$env_var"
+  done
+
   echo "Environment setup:"
   echo "  KDIR=$KDIR"
   echo "  CLANG_PATH=$CLANG_PATH"
   echo "  ARCH=$ARCH"
+  if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+    echo "  Custom env vars:"
+    for env_var in "${ENV_VARS[@]}"; do
+      echo "    $env_var"
+    done
+  fi
   echo ""
 }
 
@@ -667,6 +688,11 @@ local_shell() {
   export LLVM=1
   export LLVM_IAS=1
 
+  # Export user-defined environment variables
+  for env_var in "${ENV_VARS[@]}"; do
+    export "$env_var"
+  done
+
   # Verify directories exist
   if [[ ! -d "$KDIR" ]]; then
     echo "Error: Kernel source directory not found: $KDIR" >&2
@@ -686,6 +712,12 @@ local_shell() {
   echo "  ARCH=$ARCH"
   echo "  LLVM=$LLVM"
   echo "  LLVM_IAS=$LLVM_IAS"
+  if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+    echo "  Custom env vars:"
+    for env_var in "${ENV_VARS[@]}"; do
+      echo "    $env_var"
+    done
+  fi
   echo ""
   echo "Type 'exit' to leave the shell"
   echo "=========================================="
@@ -710,6 +742,12 @@ local_shell() {
 run_docker() {
   # run_docker [extra docker args...] -- <cmd...>
   local docker_args=("${DOCKER_COMMON_ARGS[@]}")
+
+  # Add environment variables
+  for env_var in "${ENV_VARS[@]}"; do
+    docker_args+=("-e" "$env_var")
+  done
+
   while [[ $# -gt 0 ]]; do
     if [[ "$1" == "--" ]]; then shift; break; fi
     docker_args+=("$1"); shift
