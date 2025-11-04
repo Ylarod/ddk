@@ -80,6 +80,9 @@ function build_kernel()
         -e LTO_CLANG_FULL \
         -d THINLTO
     fi
+    if [ "${branch}" = "android16-6.12" ]; then
+        scripts/config --file $out_path/.config -e CONFIG_CFI_ICALL_NORMALIZE_INTEGERS
+    fi
     # Check and set BUILD_PROC environment variable
     local build_proc=${BUILD_PROC:-$(nproc)}
     make O=$out_path -j$build_proc
