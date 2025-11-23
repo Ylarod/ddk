@@ -515,9 +515,11 @@ setup_local_env() {
   fi
 
   # Export user-defined environment variables
-  for env_var in "${ENV_VARS[@]}"; do
-    export "$env_var"
-  done
+  if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+    for env_var in "${ENV_VARS[@]}"; do
+      export "$env_var"
+    done
+  fi
 
   echo "Environment setup:"
   echo "  KDIR=$KDIR"
@@ -689,9 +691,11 @@ local_shell() {
   export LLVM_IAS=1
 
   # Export user-defined environment variables
-  for env_var in "${ENV_VARS[@]}"; do
-    export "$env_var"
-  done
+  if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+    for env_var in "${ENV_VARS[@]}"; do
+      export "$env_var"
+    done
+  fi
 
   # Verify directories exist
   if [[ ! -d "$KDIR" ]]; then
@@ -744,9 +748,11 @@ run_docker() {
   local docker_args=("${DOCKER_COMMON_ARGS[@]}")
 
   # Add environment variables
-  for env_var in "${ENV_VARS[@]}"; do
-    docker_args+=("-e" "$env_var")
-  done
+  if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
+    for env_var in "${ENV_VARS[@]}"; do
+      docker_args+=("-e" "$env_var")
+    done
+  fi
 
   while [[ $# -gt 0 ]]; do
     if [[ "$1" == "--" ]]; then shift; break; fi
