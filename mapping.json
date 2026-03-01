@@ -18,23 +18,26 @@
     { "version": "clang-r510928",  "branch": "main-kernel-build-2024" },
     { "version": "clang-r536225",  "branch": "main-kernel-2025" }
   ],
+  "rust": [
+    { "version": "rust-1.82.0", "branch": "main-kernel-2025", "repo": "platform/prebuilts/rust" }
+  ],
   "android": [
-    { "name": "android12-5.10", "branch": "android12-5.10-2025-09_r1" },
-    { "name": "android13-5.10", "branch": "android13-5.10-2025-07_r1" },
-    { "name": "android13-5.15", "branch": "android13-5.15-2025-09_r2" },
-    { "name": "android14-5.15", "branch": "android14-5.15-2025-07_r1" },
-    { "name": "android14-6.1",  "branch": "android14-6.1-2025-09_r4" },
-    { "name": "android15-6.6",  "branch": "android15-6.6-2025-09_r5" },
-    { "name": "android16-6.12", "branch": "android16-6.12-2025-09_r2" }
+    { "name": "android12-5.10", "branch": "android12-5.10-lts" },
+    { "name": "android13-5.10", "branch": "android13-5.10-lts" },
+    { "name": "android13-5.15", "branch": "android13-5.15-lts" },
+    { "name": "android14-5.15", "branch": "android14-5.15-lts" },
+    { "name": "android14-6.1",  "branch": "android14-6.1-lts" },
+    { "name": "android15-6.6",  "branch": "android15-6.6-lts" },
+    { "name": "android16-6.12", "branch": "android16-6.12-lts" }
   ],
   "matrix": [
-    { "android": "android12-5.10", "clang": "clang-r416183b" },
-    { "android": "android13-5.10", "clang": "clang-r450784e" },
-    { "android": "android13-5.15", "clang": "clang-r450784e" },
-    { "android": "android14-5.15", "clang": "clang-r487747c" },
-    { "android": "android14-6.1",  "clang": "clang-r487747c" },
-    { "android": "android15-6.6",  "clang": "clang-r510928" },
-    { "android": "android16-6.12", "clang": "clang-r536225" }
+    { "android": "android12-5.10", "clang": "clang-r416183b", "rust": null },
+    { "android": "android13-5.10", "clang": "clang-r450784e", "rust": null },
+    { "android": "android13-5.15", "clang": "clang-r450784e", "rust": null },
+    { "android": "android14-5.15", "clang": "clang-r487747c", "rust": null },
+    { "android": "android14-6.1",  "clang": "clang-r487747c", "rust": null },
+    { "android": "android15-6.6",  "clang": "clang-r510928", "rust": null },
+    { "android": "android16-6.12", "clang": "clang-r536225", "rust": "rust-1.82.0" }
   ]
 }
 
