@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # === Default Configuration ===
-MAPPING_FILE="${MAPPING_FILE:-./mapping.json}"
+MAPPING_FILE="${MAPPING_FILE:-$SCRIPT_DIR/../mapping.json}"
 SRC_REGISTRY_TYPE=""
 DST_REGISTRY_TYPE=""
 PROJECT="all"

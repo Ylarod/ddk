@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [ ! -d "/opt/ddk" ]; then
   echo "/opt/ddk is not exist";
   exit 1;
 fi
 
-source ./envsetup.sh
+source "$SCRIPT_DIR/envsetup.sh"
 
 rm -rf /opt/ddk/kdir/android*
 
-MAP_FILE=${MAP_FILE:-./mapping.json}
+MAP_FILE="${MAP_FILE:-$SCRIPT_DIR/../mapping.json}"
 if [ ! -f "$MAP_FILE" ]; then
   echo "[x] 未找到 mapping.json: $MAP_FILE"
   exit 2

@@ -70,7 +70,7 @@ make -C docker build VER=android14-6.1 PUSH=1 REG=ghcr.io/ylarod/ddk
 克隆仓库后直接执行：
 
 ```bash
-./setup.sh
+bash build/setup.sh
 ```
 
 编译完成后参考 `module_template` 创建内核模块。

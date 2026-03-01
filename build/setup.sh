@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # If not running in /opt/ddk, bind-mount current directory to /opt/ddk and cd there
 if [ "$PWD" != "/opt/ddk" ]; then
   if [ ! -d /opt/ddk ]; then
@@ -8,14 +10,14 @@ if [ "$PWD" != "/opt/ddk" ]; then
   cd /opt/ddk || { echo "Failed to cd /opt/ddk"; exit 1; }
 fi
 
-source ./envsetup.sh
+source "$SCRIPT_DIR/envsetup.sh"
 
 if [ -f setup.lock ]; then
     echo "[!] Already setup, skip"
     return
 fi
 
-MAP_FILE=${MAP_FILE:-./mapping.json}
+MAP_FILE="${MAP_FILE:-$SCRIPT_DIR/../mapping.json}"
 if [ ! -f "$MAP_FILE" ]; then
   echo "[x] 未找到 mapping.json: $MAP_FILE"
   exit 2

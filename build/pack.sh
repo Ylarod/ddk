@@ -11,6 +11,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="/opt/ddk"
 
 THREADS=$(nproc 2>/dev/null || sysctl -n hw.ncpu || echo 4)
@@ -27,7 +28,7 @@ pack_dir() {
     local prefix="$1" # src / kdir / clang
     local base_dir="$2" # 根目录
     local target_dir="$3" # 子目录名
-    local out_dir="$(pwd)/prebuilts/$prefix"
+    local out_dir="$SCRIPT_DIR/../prebuilts/$prefix"
 
     mkdir -p "$out_dir"
 

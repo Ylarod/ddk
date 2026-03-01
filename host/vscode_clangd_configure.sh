@@ -16,6 +16,8 @@ set -euo pipefail
 # ============================================================================
 
 prog=$(basename "$0")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VSCODE_TEMPLATE_DIR="$SCRIPT_DIR/.vscode"
 DDK_CONFIG_DIR="$HOME/.ddk"
 DDK_MAPPING_JSON="$DDK_CONFIG_DIR/mapping.json"
 DDK_ROOT="${DDK_ROOT:-/opt/ddk}"
@@ -155,15 +157,21 @@ configure_clangd() {
       echo "  Creating settings.json anyway..."
     fi
 
-    # Create .vscode directory if it doesn't exist
+    # Create .vscode directory and copy template
     local vscode_dir="$src_dir/.vscode"
     local settings_file="$vscode_dir/settings.json"
 
     if [[ "$dry_run" == "true" ]]; then
+      echo "  [DRY RUN] Would copy template: $VSCODE_TEMPLATE_DIR -> $vscode_dir"
       echo "  [DRY RUN] Would configure: $settings_file"
       echo "  [DRY RUN] clangd.path = $clangd_bin"
     else
       mkdir -p "$vscode_dir"
+      # Copy .vscode template files (skip settings.json, it will be handled separately)
+      if [[ -d "$VSCODE_TEMPLATE_DIR" ]]; then
+        cp -r "$VSCODE_TEMPLATE_DIR/." "$vscode_dir/"
+        echo "  ✓ Copied template: $VSCODE_TEMPLATE_DIR -> $vscode_dir"
+      fi
       update_settings_json "$settings_file" "$clangd_bin"
     fi
 
