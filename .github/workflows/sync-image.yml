@@ -60,12 +60,12 @@ jobs:
           ghcr_repo=$(jq -r '.registry["ddk"].github' mapping.json)
           docker_repo=$(jq -r '.registry["ddk"].docker' mapping.json)
           cnb_repo=$(jq -r '.registry["ddk"].cnb' mapping.json)
-          ghcr_clang_repo=$(jq -r '.registry["ddk-clang"].github' mapping.json)
-          docker_clang_repo=$(jq -r '.registry["ddk-clang"].docker' mapping.json)
-          cnb_clang_repo=$(jq -r '.registry["ddk-clang"].cnb' mapping.json)
+          ghcr_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].github' mapping.json)
+          docker_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].docker' mapping.json)
+          cnb_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].cnb' mapping.json)
 
           # 选择源
-          src_ddk="$cnb_repo"; src_clang="$cnb_clang_repo"
+          src_ddk="$cnb_repo"; src_toolchain="$cnb_toolchain_repo"
 
           # ddk 标签：来自 mapping.json.android[].name
           echo "[INFO] 从 mapping.json 收集 ddk 标签"
@@ -107,16 +107,16 @@ jobs:
             fi
           done < <(jq -r '.android[].name' mapping.json)
 
-          # ddk-clang 标签：来自 mapping.json.clang[].version
-          echo "[INFO] 从 mapping.json 收集 ddk-clang 标签"
+          # ddk-toolchain 标签：来自 mapping.json.clang[].version
+          echo "[INFO] 从 mapping.json 收集 ddk-toolchain 标签"
           clang_count=$(jq -r '.clang | length' mapping.json)
-          echo "ddk-clang 标签数量: $clang_count"
+          echo "ddk-toolchain 标签数量: $clang_count"
           while read -r tag; do
-            echo "[DEBUG] clang tag: $tag"
-            name="ddk-clang:$tag"
-            src="$src_clang:$tag"
-            dst_ghcr="$ghcr_clang_repo:$tag"
-            dst_dock="$docker_clang_repo:$tag"
+            echo "[DEBUG] toolchain tag: $tag"
+            name="ddk-toolchain:$tag"
+            src="$src_toolchain:$tag"
+            dst_ghcr="$ghcr_toolchain_repo:$tag"
+            dst_dock="$docker_toolchain_repo:$tag"
             echo "=== 同步 $name ==="
             echo "源: $src"
             echo "→ GHCR: $dst_ghcr"
@@ -129,10 +129,10 @@ jobs:
             fi
 
             if [ -n "$date_input" ]; then
-              echo "[DEBUG] clang tag with date: ${tag}-$date_input"
-              name_date="ddk-clang:${tag}-$date_input"
-              dst_ghcr_date="$ghcr_clang_repo:${tag}-$date_input"
-              dst_dock_date="$docker_clang_repo:${tag}-$date_input"
+              echo "[DEBUG] toolchain tag with date: ${tag}-$date_input"
+              name_date="ddk-toolchain:${tag}-$date_input"
+              dst_ghcr_date="$ghcr_toolchain_repo:${tag}-$date_input"
+              dst_dock_date="$docker_toolchain_repo:${tag}-$date_input"
               echo "=== 同步 $name_date ==="
               echo "源: $src"
               echo "→ GHCR: $dst_ghcr_date"

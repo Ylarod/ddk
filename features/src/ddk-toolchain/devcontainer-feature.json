@@ -1,0 +1,21 @@
+{
+  "name": "DDK Toolchain",
+  "id": "ddk-toolchain",
+  "version": "0.2.0",
+  "description": "根据 Android 版本自动从 cnb.cool LFS 下载并导入对应的 Clang（及可选 Rust）工具链到 /opt/ddk/",
+  "options": {
+    "androidVer": {
+      "type": "string",
+      "description": "Android 版本（例如 android14-6.1），自动从 mapping.json 解析对应的 Clang/Rust 版本",
+      "default": "android12-5.10"
+    },
+    "setDefault": {
+      "type": "boolean",
+      "description": "写入 /etc/bash.bashrc，导出 CLANG_PATH/RUST_PATH/DDK_ROOT",
+      "default": true
+    }
+  },
+  "containerEnv": {
+    "DDK_ROOT": "/opt/ddk"
+  }
+}

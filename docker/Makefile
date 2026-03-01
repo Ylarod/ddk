@@ -8,7 +8,8 @@ ifeq ($(JQ),)
   $(error "jq 未安装，请先安装 jq 以解析 $(ROOT)/mapping.json")
 endif
 
-MATRIX := $(shell jq -r '.matrix[] | "\(.android):\(.clang)"' $(ROOT)/mapping.json | tr '\n' ' ')
+MATRIX   := $(shell jq -r '.matrix[] | "\(.android):\(.clang):\(.rust // "")"' $(ROOT)/mapping.json | tr '\n' ' ')
+ANDROIDS := $(shell jq -r '.android[].name' $(ROOT)/mapping.json | tr '\n' ' ')
 
 # ghcr.io/ylarod
 # docker.cnb.cool/ylarod/ddk
@@ -23,45 +24,79 @@ REV  := $(shell git -C $(ROOT) rev-parse HEAD)
 BUILDKIT ?= 1
 DOCKER ?= docker
 
-.PHONY: list toolchains build build-all push push-all push-toolchains
+.PHONY: list builder cnb-dev ddk-dev ddk-dev-all toolchains build build-all push push-all push-toolchains
 
 list:
 	@for i in $(MATRIX); do echo $$i; done
 
+builder:
+	@echo "==> Building $(REG)/ddk-builder:latest"
+	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--push,--load) \
+	  -f $(ROOT)/docker/ddk-builder/Dockerfile \
+	  -t $(REG)/ddk-builder:latest $(ROOT)
+
+cnb-dev:
+	@echo "==> Building $(REG)/ddk-cnb-dev:latest"
+	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--push,--load) \
+	  -f $(ROOT)/docker/ddk-cnb-dev/Dockerfile \
+	  -t $(REG)/ddk-cnb-dev:latest $(ROOT)
+
+# 用法：make ddk-dev VER=android14-6.1
+ddk-dev:
+	@if [ -z "$(VER)" ]; then echo "Usage: make ddk-dev VER=<androidX-Y>"; exit 1; fi
+	@echo "==> Building $(REG)/ddk-dev:$(VER)"
+	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--push,--load) \
+	  --build-arg ANDROID_VER=$(VER) \
+	  -f $(ROOT)/docker/ddk-dev/Dockerfile \
+	  -t $(REG)/ddk-dev:$(VER) $(ROOT)
+
+ddk-dev-all:
+	@for ver in $(ANDROIDS); do \
+	  $(MAKE) ddk-dev VER=$$ver || exit $$?; \
+	done
+
 toolchains:
 	@for pair in $(MATRIX); do \
-	  CLANG=$${pair##*:}; \
-	  if [ "$(FORCE)" = "1" ] || ! $(DOCKER) image inspect $(REG)/$(IMG)/clang:$$CLANG >/dev/null 2>&1 || $(FORCE); then \
-	    echo "==> Building toolchain $(REG)/$(IMG)/clang:$$CLANG"; \
+	  CLANG=$$(echo $$pair | cut -d: -f2); \
+	  RUST=$$(echo $$pair | cut -d: -f3); \
+	  if [ "$(FORCE)" = "1" ] || ! $(DOCKER) image inspect $(REG)/ddk-toolchain:$$CLANG >/dev/null 2>&1; then \
+	    echo "==> Building toolchain $(REG)/ddk-toolchain:$$CLANG"; \
 	    DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
 	      $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,--load) \
 	      --build-arg CLANG_VER=$$CLANG \
-	      -f $(ROOT)/docker/toolchain/Dockerfile.clang \
-	      -t $(REG)/$(IMG)/clang:$$CLANG $(ROOT) || exit $$?; \
+	      --build-arg RUST_VER=$$RUST \
+	      -f $(ROOT)/docker/ddk-toolchain/Dockerfile \
+	      -t $(REG)/ddk-toolchain:$$CLANG $(ROOT) || exit $$?; \
 	  fi; \
 	done
 
 push-toolchains:
 	@for pair in $(MATRIX); do \
-	  CLANG=$${pair##*:}; \
-	  echo "==> Pushing $(REG)/$(IMG)/clang:$$CLANG"; \
-	  $(DOCKER) push $(REG)/$(IMG)/clang:$$CLANG || exit $$?; \
+	  CLANG=$$(echo $$pair | cut -d: -f2); \
+	  echo "==> Pushing $(REG)/ddk-toolchain:$$CLANG"; \
+	  $(DOCKER) push $(REG)/ddk-toolchain:$$CLANG || exit $$?; \
 	done
 
 # 用法：make build VER=android14-6.1
 build:
 	@if [ -z "$(VER)" ]; then echo "Usage: make build VER=<androidX-Y>"; exit 1; fi
-	@CLANG=$$(echo "$(MATRIX)" | tr ' ' '\n' | grep "^$(VER):" | cut -d: -f2); \
+	@ENTRY=$$(echo "$(MATRIX)" | tr ' ' '\n' | grep "^$(VER):"); \
+	CLANG=$$(echo $$ENTRY | cut -d: -f2); \
+	RUST=$$(echo $$ENTRY | cut -d: -f3); \
 	if [ -z "$$CLANG" ]; then echo "CLANG not found for $(VER)"; exit 2; fi; \
-	echo "==> Building $(REG)/$(IMG):$(VER) with $$CLANG"; \
+	echo "==> Building $(REG)/$(IMG):$(VER) with $$CLANG $${RUST:+(rust: $$RUST)}"; \
 	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
 	  $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,) \
 	  --build-arg CLANG_VER=$$CLANG \
+	  --build-arg RUST_VER=$$RUST \
 	  --build-arg ANDROID_VER=$(VER) \
 	  --build-arg VERSION=$(VER) \
 	  --build-arg REVISION=$(REV) \
 	  --build-arg CREATED=$(DATE) \
-	  -f $(ROOT)/docker/Dockerfile \
+	  -f $(ROOT)/docker/ddk/Dockerfile \
 	  -t $(REG)/$(IMG):$(VER) $(ROOT)
 
 build-all:

@@ -30,7 +30,7 @@ RUN curl -fsSL https://code-server.dev/install.sh | ARCH=amd64 sh &&\
 # 安装 uv
 RUN sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)"
 
-COPY .cnb/cnb-dev/scripts ./scripts
+COPY docker/ddk-cnb-dev/scripts ./scripts
 
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
     git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
@@ -44,9 +44,9 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
 # 在最开始 source /etc/profile 
 RUN sed -i '1isetopt NULL_GLOB 2>/dev/null\nsource /etc/profile\nunsetopt NULL_GLOB 2>/dev/null' $HOME/.zshrc
 
-COPY .cnb/cnb-dev/settings.json /root/.vscode-server/data/Machine/settings.json
-COPY .cnb/cnb-dev/settings.json /root/.local/share/code-server/Machine/settings.json
-COPY .cnb/cnb-dev/gitconfig /root/.gitconfig
+COPY docker/ddk-cnb-dev/settings.json /root/.vscode-server/data/Machine/settings.json
+COPY docker/ddk-cnb-dev/settings.json /root/.local/share/code-server/Machine/settings.json
+COPY docker/ddk-cnb-dev/gitconfig /root/.gitconfig
 
 # 指定字符集支持命令行输入中文（根据需要选择字符集）
 ENV LANG=C.UTF-8

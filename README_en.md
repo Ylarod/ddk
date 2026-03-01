@@ -28,7 +28,7 @@ You can modify the `features` to assemble the image you need. Available versions
 
 References:
 
-- [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
+- [ddk-toolchain](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-toolchain/devcontainer-feature.json)
 - [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
 
 For users with M1 Mac + orbstack, Ref to `module_template/.devcontainer`, and pull image in advance.
@@ -44,8 +44,8 @@ For x86_64 users:
   "name": "ddk-module-dev",
   "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
   "features": {
-    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
-      "clangVer": "clang-r416183b",
+    "ghcr.io/ylarod/ddk/features/ddk-toolchain:latest": {
+      "androidVer": "android12-5.10",
       "setDefault": true
     },
     "ghcr.io/ylarod/ddk/features/ddk-src:latest": {

@@ -5,7 +5,13 @@
       "docker": "docker.io/ylarod/ddk",
       "cnb": "docker.cnb.cool/ylarod/ddk/ddk"
     },
+    "ddk-toolchain": {
+      "github": "ghcr.io/ylarod/ddk/toolchain",
+      "docker": "docker.io/ylarod/ddk-toolchain",
+      "cnb": "docker.cnb.cool/ylarod/ddk/ddk-toolchain"
+    },
     "ddk-clang": {
+      "deprecated": true,
       "github": "ghcr.io/ylarod/ddk/clang",
       "docker": "docker.io/ylarod/ddk-clang",
       "cnb": "docker.cnb.cool/ylarod/ddk/ddk-clang"

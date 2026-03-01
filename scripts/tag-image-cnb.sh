@@ -7,7 +7,7 @@ set -euo pipefail
 # 注意：不包含 tag，tag 会自动带上日期后缀
 MAPPINGS=(
   "ghcr.io/ylarod/ddk docker.cnb.cool/ylarod/ddk/ddk"
-  "ghcr.io/ylarod/ddk/clang docker.cnb.cool/ylarod/ddk/ddk-clang"
+  "ghcr.io/ylarod/ddk/toolchain docker.cnb.cool/ylarod/ddk/ddk-toolchain"
 )
 
 DATE="$(date +%Y%m%d)"

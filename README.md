@@ -32,7 +32,7 @@ submodule 下的 prebuilts tarball 文件很大，非必要不要 clone submodul
 
 参考：
 
-- [ddk-clang](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-clang/devcontainer-feature.json)
+- [ddk-toolchain](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-toolchain/devcontainer-feature.json)
 - [ddk-src](https://github.com/Ylarod/ddk/blob/main/features/src/ddk-src/devcontainer-feature.json)
 
 对于 M1 Mac + orbstack 用户，参考 `module_template/.devcontainer` 下的配置可以开发，还需要提取拉取镜像
@@ -48,8 +48,8 @@ docker run --platform linux/amd64 --rm -it docker.cnb.cool/ylarod/ddk/ddk-builde
   "name": "ddk-module-dev",
   "image": "docker.cnb.cool/ylarod/ddk/ddk-builder:latest",
   "features": {
-    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
-      "clangVer": "clang-r416183b",
+    "ghcr.io/ylarod/ddk/features/ddk-toolchain:latest": {
+      "androidVer": "android12-5.10",
       "setDefault": true
     },
     "ghcr.io/ylarod/ddk/features/ddk-src:latest": {

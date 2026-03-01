@@ -21,7 +21,7 @@ Sync container images between registries using skopeo.
 OPTIONS:
   -s, --src <registry>     Source registry type (github|docker|cnb) [REQUIRED]
   -d, --dst <registry>     Destination registry type (github|docker|cnb) [REQUIRED]
-  -p, --project <name>     Project to sync (ddk|ddk-clang|all) [default: all]
+  -p, --project <name>     Project to sync (ddk|ddk-toolchain|ddk-clang|all) [default: all]
   -m, --mapping <file>     Path to mapping.json file [default: ./mapping.json]
   --date <date>            Sync images with date tag (src:ver-date -> dst:ver-date)
   --new-date <date>        Add new date tag to destination (src:ver -> dst:ver-newdate)
@@ -139,9 +139,9 @@ validate_registry_type "$SRC_REGISTRY_TYPE" "source"
 validate_registry_type "$DST_REGISTRY_TYPE" "destination"
 
 # Validate project
-if [[ "$PROJECT" != "all" && "$PROJECT" != "ddk" && "$PROJECT" != "ddk-clang" ]]; then
+if [[ "$PROJECT" != "all" && "$PROJECT" != "ddk" && "$PROJECT" != "ddk-toolchain" && "$PROJECT" != "ddk-clang" ]]; then
   echo "Error: Invalid project: $PROJECT"
-  echo "Valid projects: ddk, ddk-clang, all"
+  echo "Valid projects: ddk, ddk-toolchain, ddk-clang, all"
   exit 1
 fi
 
@@ -221,16 +221,19 @@ sync_image() {
 # Get registry URLs from mapping.json
 SRC_REGISTRY_DDK=$(jq -r ".registry.ddk.$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
 DST_REGISTRY_DDK=$(jq -r ".registry.ddk.$DST_REGISTRY_TYPE" "$MAPPING_FILE")
+SRC_REGISTRY_TOOLCHAIN=$(jq -r ".registry[\"ddk-toolchain\"].$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
+DST_REGISTRY_TOOLCHAIN=$(jq -r ".registry[\"ddk-toolchain\"].$DST_REGISTRY_TYPE" "$MAPPING_FILE")
 SRC_REGISTRY_CLANG=$(jq -r ".registry[\"ddk-clang\"].$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
 DST_REGISTRY_CLANG=$(jq -r ".registry[\"ddk-clang\"].$DST_REGISTRY_TYPE" "$MAPPING_FILE")
 
 echo "   DDK: $SRC_REGISTRY_DDK -> $DST_REGISTRY_DDK"
-echo "   Clang: $SRC_REGISTRY_CLANG -> $DST_REGISTRY_CLANG"
+echo "   Toolchain: $SRC_REGISTRY_TOOLCHAIN -> $DST_REGISTRY_TOOLCHAIN"
+echo "   Clang (deprecated): $SRC_REGISTRY_CLANG -> $DST_REGISTRY_CLANG"
 echo
 
-# Process clang images
-if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-clang" ]]; then
-  echo "Processing clang images..."
+# Process toolchain images
+if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-toolchain" ]]; then
+  echo "Processing toolchain images..."
   clang_versions=$(jq -r '.clang[].version' "$MAPPING_FILE")
   clang_branches=$(jq -r '.clang[].branch' "$MAPPING_FILE")
 
@@ -242,7 +245,26 @@ if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-clang" ]]; then
     version="${clang_version_array[$i]}"
     branch="${clang_branch_array[$i]}"
 
-    echo "[Clang] ${version} (${branch})"
+    echo "[Toolchain] ${version} (${branch})"
+    sync_image "$SRC_REGISTRY_TOOLCHAIN" "$DST_REGISTRY_TOOLCHAIN" "$version" || echo "WARNING: Failed to sync ${version}"
+  done
+fi
+
+# Process clang images (deprecated, kept for backward compatibility)
+if [[ "$PROJECT" == "ddk-clang" ]]; then
+  echo "Processing clang images (deprecated)..."
+  clang_versions=$(jq -r '.clang[].version' "$MAPPING_FILE")
+  clang_branches=$(jq -r '.clang[].branch' "$MAPPING_FILE")
+
+  # Convert to arrays
+  IFS=$'\n' read -d '' -r -a clang_version_array <<< "$clang_versions" || true
+  IFS=$'\n' read -d '' -r -a clang_branch_array <<< "$clang_branches" || true
+
+  for i in "${!clang_version_array[@]}"; do
+    version="${clang_version_array[$i]}"
+    branch="${clang_branch_array[$i]}"
+
+    echo "[Clang] ${version} (${branch}) (deprecated)"
     sync_image "$SRC_REGISTRY_CLANG" "$DST_REGISTRY_CLANG" "$version" || echo "WARNING: Failed to sync ${version}"
   done
 fi

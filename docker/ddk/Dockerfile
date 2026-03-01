@@ -1,5 +1,5 @@
 ARG CLANG_VER
-FROM docker.cnb.cool/ylarod/ddk/ddk-clang:${CLANG_VER}
+FROM docker.cnb.cool/ylarod/ddk/ddk-toolchain:${CLANG_VER}
 ARG CLANG_VER
 
 WORKDIR /opt/ddk

@@ -30,12 +30,8 @@ main:
       stages:
         - name: docker build
           script: |
-            apt update && apt install -y jq --no-install-recommends
-            jq -r '.android[] | [.name] | @tsv' "mapping.json" | while IFS=$'\t' read -r name; do
-              [ -n "$name" ] || continue
-              echo "Building ddk-dev for Android version: $name"
-              docker buildx build --push --build-arg ANDROID_VER=$name -t ${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-dev:$name . -f .cnb/ddk-dev/Dockerfile
-            done
+            apt update && apt install -y jq make --no-install-recommends
+            make -C docker ddk-dev-all PUSH=1 REG=${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}
 
   web_trigger_cnb_dev:
     - name: ddk-cnb-dev
@@ -48,15 +44,12 @@ main:
       services:
         - docker
       stages:
-        - name: set docker tag
-          script: echo -n "${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-cnb-dev:latest"
-          exports:
-            info: IMAGE_TAG
         - name: docker build
           script: |
+            apt update && apt install -y jq make --no-install-recommends
             GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
             git lfs pull --include="prebuilts/clang/"
-            docker buildx build --push -t $IMAGE_TAG . -f .cnb/cnb-dev/Dockerfile
+            make -C docker cnb-dev PUSH=1 REG=${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}
   
   web_trigger_builder:
     - name: ddk-builder
@@ -68,11 +61,7 @@ main:
       services:
         - docker
       stages:
-        - name: set docker tag
-          script: echo -n "${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}/ddk-builder:latest"
-          exports:
-            info: IMAGE_TAG
-        - name: build image
+        - name: docker build
           script: |
-            docker build -t $IMAGE_TAG . -f .cnb/Dockerfile
-            docker push $IMAGE_TAG
+            apt update && apt install -y jq make --no-install-recommends
+            make -C docker builder PUSH=1 REG=${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}

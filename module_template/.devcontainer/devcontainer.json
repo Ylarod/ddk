@@ -6,8 +6,8 @@
   "service": "ddk",
   "workspaceFolder": "/workspace",
   "features": {
-    "ghcr.io/ylarod/ddk/features/ddk-clang:latest": {
-      "clangVer": "clang-r416183b",
+    "ghcr.io/ylarod/ddk/features/ddk-toolchain:latest": {
+      "androidVer": "android12-5.10",
       "setDefault": true
     },
     "ghcr.io/ylarod/ddk/features/ddk-src:latest": {
