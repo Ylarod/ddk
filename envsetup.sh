@@ -31,6 +31,7 @@ function setup_source()
     git clone https://android.googlesource.com/kernel/common -b $branch --depth 1 /opt/ddk/src/$name
     pushd /opt/ddk/src/$name
     sed -i '/check_exports(mod);/s/^/\/\//' scripts/mod/modpost.c
+    sed -i '/s->module = exp->module;/s/^/\/\//' scripts/mod/modpost.c
     popd
 }
 
