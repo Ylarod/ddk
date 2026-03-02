@@ -1,10 +1,11 @@
-ARG CLANG_VER
-FROM docker.cnb.cool/ylarod/ddk/ddk-toolchain:${CLANG_VER}
-ARG CLANG_VER
+ARG ANDROID_VER
+FROM docker.cnb.cool/ylarod/ddk/ddk-toolchain:${ANDROID_VER}
 
 WORKDIR /opt/ddk
 
 ARG ANDROID_VER
+ARG CLANG_VER
+ARG RUST_VER
 ARG VERSION="${ANDROID_VER}"
 ARG REVISION
 ARG CREATED
@@ -28,7 +29,9 @@ LABEL org.opencontainers.image.title="DDK ${ANDROID_VER}" \
       io.ddk.project="ddk" \
       io.ddk.android.version="${ANDROID_VER}" \
       io.ddk.clang.version="${CLANG_VER}" \
+      io.ddk.rust.version="${RUST_VER}" \
       io.ddk.kernel.src="${ANDROID_VER}"
+      
 
 RUN --mount=type=bind,source=./prebuilts/src/src.${ANDROID_VER}.tar.zst,target=/tmp/src.tar.zst,readonly \
     --mount=type=bind,source=./prebuilts/kdir/kdir.${ANDROID_VER}.tar.zst,target=/tmp/kdir.tar.zst,readonly \

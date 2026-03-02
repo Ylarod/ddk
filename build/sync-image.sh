@@ -236,19 +236,18 @@ echo
 # Process toolchain images
 if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-toolchain" ]]; then
   echo "Processing toolchain images..."
-  clang_versions=$(jq -r '.clang[].version' "$MAPPING_FILE")
-  clang_branches=$(jq -r '.clang[].branch' "$MAPPING_FILE")
+  toolchain_android_tags=$(jq -r '.matrix[].android' "$MAPPING_FILE")
 
   # Convert to arrays
-  IFS=$'\n' read -d '' -r -a clang_version_array <<< "$clang_versions" || true
-  IFS=$'\n' read -d '' -r -a clang_branch_array <<< "$clang_branches" || true
+  IFS=$'\n' read -d '' -r -a toolchain_android_array <<< "$toolchain_android_tags" || true
 
-  for i in "${!clang_version_array[@]}"; do
-    version="${clang_version_array[$i]}"
-    branch="${clang_branch_array[$i]}"
+  for android_tag in "${toolchain_android_array[@]}"; do
+    if [[ -z "$android_tag" || "$android_tag" == "null" ]]; then
+      continue
+    fi
 
-    echo "[Toolchain] ${version} (${branch})"
-    sync_image "$SRC_REGISTRY_TOOLCHAIN" "$DST_REGISTRY_TOOLCHAIN" "$version" || echo "WARNING: Failed to sync ${version}"
+    echo "[Toolchain] ${android_tag}"
+    sync_image "$SRC_REGISTRY_TOOLCHAIN" "$DST_REGISTRY_TOOLCHAIN" "$android_tag" || echo "WARNING: Failed to sync ${android_tag}"
   done
 fi
 

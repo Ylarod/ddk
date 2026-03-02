@@ -44,24 +44,25 @@ cnb-dev:
 
 toolchains:
 	@for pair in $(MATRIX); do \
+	  ANDROID=$$(echo $$pair | cut -d: -f1); \
 	  CLANG=$$(echo $$pair | cut -d: -f2); \
 	  RUST=$$(echo $$pair | cut -d: -f3); \
-	  if [ "$(FORCE)" = "1" ] || ! $(DOCKER) image inspect $(REG)/ddk-toolchain:$$CLANG >/dev/null 2>&1; then \
-	    echo "==> Building toolchain $(REG)/ddk-toolchain:$$CLANG"; \
+	  if [ "$(FORCE)" = "1" ] || ! $(DOCKER) image inspect $(REG)/ddk-toolchain:$$ANDROID >/dev/null 2>&1; then \
+	    echo "==> Building toolchain $(REG)/ddk-toolchain:$$ANDROID (clang: $$CLANG$${RUST:+, rust: $$RUST})"; \
 	    DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
 	      $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,--load) \
 	      --build-arg CLANG_VER=$$CLANG \
 	      --build-arg RUST_VER=$$RUST \
 	      -f $(ROOT)/docker/ddk-toolchain/Dockerfile \
-	      -t $(REG)/ddk-toolchain:$$CLANG $(ROOT) || exit $$?; \
+	      -t $(REG)/ddk-toolchain:$$ANDROID $(ROOT) || exit $$?; \
 	  fi; \
 	done
 
 push-toolchains:
 	@for pair in $(MATRIX); do \
-	  CLANG=$$(echo $$pair | cut -d: -f2); \
-	  echo "==> Pushing $(REG)/ddk-toolchain:$$CLANG"; \
-	  $(DOCKER) push $(REG)/ddk-toolchain:$$CLANG || exit $$?; \
+	  ANDROID=$$(echo $$pair | cut -d: -f1); \
+	  echo "==> Pushing $(REG)/ddk-toolchain:$$ANDROID"; \
+	  $(DOCKER) push $(REG)/ddk-toolchain:$$ANDROID || exit $$?; \
 	done
 
 # 用法：make build VER=android14-6.1

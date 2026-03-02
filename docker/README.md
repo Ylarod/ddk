@@ -15,7 +15,7 @@
 ```
 ubuntu:25.04
 └── ddk-builder
-    ├── ddk-toolchain:{CLANG_VER} (Clang + 可选 Rust)
+    ├── ddk-toolchain:{ANDROID_VER} (Clang + 可选 Rust)
     │   └── ddk:{ANDROID_VER}
     └── ddk-cnb-dev
 ```

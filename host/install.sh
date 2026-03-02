@@ -7,6 +7,7 @@ DDK_ROOT=/opt/ddk
 SRC_BASE_DIR=$DDK_ROOT/src
 KDIR_BASE_DIR=$DDK_ROOT/kdir
 CLANG_BASE_DIR=$DDK_ROOT/clang
+RUST_BASE_DIR=$DDK_ROOT/rust
 
 # Color definitions
 RED='\033[0;31m'
@@ -117,6 +118,7 @@ main() {
 
     # Extract all components
     extract_archives "clang" "$CLANG_BASE_DIR" ""
+    extract_archives "rust" "$RUST_BASE_DIR" ""
     extract_archives "src" "$SRC_BASE_DIR" "src."
     extract_archives "kdir" "$KDIR_BASE_DIR" "kdir."
 
@@ -128,4 +130,3 @@ main() {
 
 # Run main function
 main
-
