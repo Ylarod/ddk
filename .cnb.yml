@@ -1,6 +1,6 @@
 $:
   vscode:
-    - name: ddk-dev
+    - name: ddk-cnb-dev
       runner:
         cpus: 8
       docker:
@@ -18,21 +18,6 @@ $:
             uname -a
 
 main:
-  web_trigger_ddk_dev:
-    - name: ddk-dev
-      runner:
-        cpus: 4
-      git:
-        enable: true
-        submodules: false
-      services:
-        - docker
-      stages:
-        - name: docker build
-          script: |
-            apt update && apt install -y jq make --no-install-recommends
-            make -C docker ddk-dev-all PUSH=1 REG=${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}
-
   web_trigger_cnb_dev:
     - name: ddk-cnb-dev
       runner:

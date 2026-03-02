@@ -9,7 +9,6 @@ ifeq ($(JQ),)
 endif
 
 MATRIX   := $(shell jq -r '.matrix[] | "\(.android):\(.clang):\(.rust // "")"' $(ROOT)/mapping.json | tr '\n' ' ')
-ANDROIDS := $(shell jq -r '.android[].name' $(ROOT)/mapping.json | tr '\n' ' ')
 
 # ghcr.io/ylarod
 # docker.cnb.cool/ylarod/ddk
@@ -24,7 +23,7 @@ REV  := $(shell git -C $(ROOT) rev-parse HEAD)
 BUILDKIT ?= 1
 DOCKER ?= docker
 
-.PHONY: list builder cnb-dev ddk-dev ddk-dev-all toolchains build build-all push push-all push-toolchains
+.PHONY: list builder cnb-dev toolchains build build-all push push-all push-toolchains
 
 list:
 	@for i in $(MATRIX); do echo $$i; done
@@ -42,21 +41,6 @@ cnb-dev:
 	  $(if $(filter 1,$(PUSH)),--push,--load) \
 	  -f $(ROOT)/docker/ddk-cnb-dev/Dockerfile \
 	  -t $(REG)/ddk-cnb-dev:latest $(ROOT)
-
-# 用法：make ddk-dev VER=android14-6.1
-ddk-dev:
-	@if [ -z "$(VER)" ]; then echo "Usage: make ddk-dev VER=<androidX-Y>"; exit 1; fi
-	@echo "==> Building $(REG)/ddk-dev:$(VER)"
-	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
-	  $(if $(filter 1,$(PUSH)),--push,--load) \
-	  --build-arg ANDROID_VER=$(VER) \
-	  -f $(ROOT)/docker/ddk-dev/Dockerfile \
-	  -t $(REG)/ddk-dev:$(VER) $(ROOT)
-
-ddk-dev-all:
-	@for ver in $(ANDROIDS); do \
-	  $(MAKE) ddk-dev VER=$$ver || exit $$?; \
-	done
 
 toolchains:
 	@for pair in $(MATRIX); do \
