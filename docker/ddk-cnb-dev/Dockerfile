@@ -29,6 +29,24 @@ RUN --mount=type=bind,source=prebuilts/clang,target=/mnt/clang,readonly \
       fi; \
     done
 
+# 从构建上下文绑定挂载 prebuilts/rust 目录，避免 COPY
+RUN --mount=type=bind,source=prebuilts/rust,target=/mnt/rust,readonly \
+    set -eux; \
+    mkdir -p /opt/ddk/rust; \
+    for f in /mnt/rust/*.tar.zst; do \
+      [ -e "$f" ] || continue; \
+      name="$(basename "$f")"; \
+      version="${name%.tar.zst}"; \
+      dest="/opt/ddk/rust/"; \
+      if [ ! -d "$dest" ] || [ -z "$(ls -A "$dest" 2>/dev/null || true)" ]; then \
+        echo "[+] Importing rust $version from $name"; \
+        mkdir -p "$dest"; \
+        tar -I zstd -xf "$f" -C "$dest"; \
+      else \
+        echo "[!] rust $version already present, skipping"; \
+      fi; \
+    done
+
 # install vscode and extension
 RUN curl -fsSL https://code-server.dev/install.sh | sh &&\
     code-server --install-extension cnbcool.cnb-welcome &&\

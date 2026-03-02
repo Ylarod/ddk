@@ -48,7 +48,7 @@ main:
           script: |
             apt update && apt install -y jq make --no-install-recommends
             GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
-            git lfs pull --include="prebuilts/clang/"
+            git lfs pull --include="prebuilts/clang/,prebuilts/rust/"
             make -C docker cnb-dev PUSH=1 REG=${CNB_DOCKER_REGISTRY}/${CNB_REPO_SLUG_LOWERCASE}
   
   web_trigger_builder:
