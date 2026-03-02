@@ -19,7 +19,6 @@ THREADS=$(nproc 2>/dev/null || sysctl -n hw.ncpu || echo 4)
 ZSTFLAGS="-10 -T${THREADS}"
 TARFLAGS=(
   --sort=name
-  --mtime='2025-01-01 UTC'
   --owner=0 --group=0 --numeric-owner
   --exclude-vcs
   --exclude='.git*'
@@ -30,6 +29,10 @@ pack_dir() {
     local base_dir="$2" # 根目录
     local target_dir="$3" # 子目录名
     local out_dir="$SCRIPT_DIR/../prebuilts/$prefix"
+    local mtime='2026-01-01 UTC'
+    if [[ "$prefix" == "kdir" ]]; then
+        mtime='2026-01-01 00:00:01 UTC'
+    fi
 
     mkdir -p "$out_dir"
 
@@ -41,7 +44,7 @@ pack_dir() {
     fi
 
     echo "→ Packing $base_dir/$target_dir → $(basename "$out_file")"
-    tar "${TARFLAGS[@]}" -C "$base_dir" \
+    tar "${TARFLAGS[@]}" --mtime="$mtime" -C "$base_dir" \
         -I "zstd ${ZSTFLAGS}" \
         -cf "$out_file" "$target_dir"
 }
