@@ -25,7 +25,8 @@
     { "version": "clang-r536225",  "branch": "main-kernel-2025" }
   ],
   "rust": [
-    { "version": "rust-1.82.0", "branch": "main-kernel-2025", "repo": "platform/prebuilts/rust" }
+    { "version": "rust-1.82.0", "branch": "main-kernel-2025", "repo": "platform/prebuilts/rust" },
+    { "version": "rust-1.91.1", "branch": "main-kernel-2026", "repo": "platform/prebuilts/rust-toolchain/linux-x86" }
   ],
   "android": [
     { "name": "android12-5.10", "branch": "android12-5.10-lts" },
