@@ -5,11 +5,11 @@ WORKDIR /opt/ddk
 ARG CLANG_VER
 ARG RUST_VER=""
 
-RUN --mount=type=bind,source=clang/${CLANG_VER}.tar.zst,target=/mnt/clang.tar.zst,readonly \
+RUN --mount=type=bind,source=prebuilts/clang/${CLANG_VER}.tar.zst,target=/mnt/clang.tar.zst,readonly \
     mkdir -p /opt/ddk/clang/; \
     tar -I zstd -xf "/mnt/clang.tar.zst" -C "/opt/ddk/clang/";
 
-RUN --mount=type=bind,source=rust/,target=/mnt/rust,readonly \
+RUN --mount=type=bind,source=prebuilts/rust/,target=/mnt/rust,readonly \
     set -eu; \
     if [ -n "${RUST_VER}" ] && [ -f "/mnt/rust/${RUST_VER}.tar.zst" ]; then \
       echo "[+] Importing rust ${RUST_VER}"; \
