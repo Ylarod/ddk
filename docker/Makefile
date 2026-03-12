@@ -23,7 +23,7 @@ REV  := $(shell git -C $(ROOT) rev-parse HEAD)
 BUILDKIT ?= 1
 DOCKER ?= docker
 
-.PHONY: list builder cnb-dev toolchains build build-all push push-all push-toolchains
+.PHONY: list builder cnb-dev toolchains build build-all build-min build-min-all push push-all push-min push-min-all push-toolchains
 
 list:
 	@for i in $(MATRIX); do echo $$i; done
@@ -90,6 +90,31 @@ build-all:
 	  $(MAKE) build VER=$$VER || exit $$?; \
 	done
 
+# 用法：make build-min VER=android14-6.1
+build-min:
+	@if [ -z "$(VER)" ]; then echo "Usage: make build-min VER=<androidX-Y>"; exit 1; fi
+	@ENTRY=$$(echo "$(MATRIX)" | tr ' ' '\n' | grep "^$(VER):"); \
+	CLANG=$$(echo $$ENTRY | cut -d: -f2); \
+	RUST=$$(echo $$ENTRY | cut -d: -f3); \
+	if [ -z "$$CLANG" ]; then echo "CLANG not found for $(VER)"; exit 2; fi; \
+	echo "==> Building $(REG)/ddk-min:$(VER) with $$CLANG $${RUST:+(rust: $$RUST)}"; \
+	DOCKER_BUILDKIT=$(BUILDKIT) $(DOCKER) buildx build \
+	  $(if $(filter 1,$(PUSH)),--platform $(PLAT) --push,) \
+	  --build-arg CLANG_VER=$$CLANG \
+	  --build-arg RUST_VER=$$RUST \
+	  --build-arg ANDROID_VER=$(VER) \
+	  --build-arg VERSION=$(VER) \
+	  --build-arg REVISION=$(REV) \
+	  --build-arg CREATED=$(DATE) \
+	  -f $(ROOT)/docker/ddk-min/Dockerfile \
+	  -t $(REG)/ddk-min:$(VER) $(ROOT)
+
+build-min-all:
+	@for pair in $(MATRIX); do \
+	  VER=$${pair%%:*}; \
+	  $(MAKE) build-min VER=$$VER || exit $$?; \
+	done
+
 push:
 	@if [ -z "$(VER)" ]; then echo "Usage: make push VER=<androidX-Y>"; exit 1; fi
 	@echo "==> Pushing $(REG)/$(IMG):$(VER)"; \
@@ -100,4 +125,16 @@ push-all:
 	  VER=$${pair%%:*}; \
 	  echo "==> Pushing $(REG)/$(IMG):$$VER"; \
 	  $(DOCKER) push $(REG)/$(IMG):$$VER || exit $$?; \
+	done
+
+push-min:
+	@if [ -z "$(VER)" ]; then echo "Usage: make push-min VER=<androidX-Y>"; exit 1; fi
+	@echo "==> Pushing $(REG)/ddk-min:$(VER)"; \
+	$(DOCKER) push $(REG)/ddk-min:$(VER)
+
+push-min-all:
+	@for pair in $(MATRIX); do \
+	  VER=$${pair%%:*}; \
+	  echo "==> Pushing $(REG)/ddk-min:$$VER"; \
+	  $(DOCKER) push $(REG)/ddk-min:$$VER || exit $$?; \
 	done

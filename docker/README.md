@@ -7,6 +7,7 @@
 | `ddk-builder` | `ddk-builder/Dockerfile` | 基础构建环境，包含 GCC/Clang/内核构建依赖 |
 | `ddk-toolchain` | `ddk-toolchain/Dockerfile` | 工具链镜像，预装 Clang 和可选的 Rust 工具链 |
 | `ddk` | `ddk/Dockerfile` | 完整 DDK 镜像，包含内核源码和预编译 kdir |
+| `ddk-min` | `ddk-min/Dockerfile` | 精简 DDK 镜像，使用 modules_prepare 生成的最小 kdir |
 | `ddk-cnb-dev` | `ddk-cnb-dev/Dockerfile` | CNB 云开发环境，附带 code-server 和全部 Clang 工具链 |
 | ~~`ddk-clang`~~ | — | **已弃用**，由 `ddk-toolchain` 替代 |
 
@@ -16,13 +17,15 @@
 ubuntu:25.04
 └── ddk-builder
     ├── ddk-toolchain:{ANDROID_VER} (Clang + 可选 Rust)
-    │   └── ddk:{ANDROID_VER}
+    │   ├── ddk:{ANDROID_VER}
+    │   └── ddk-min:{ANDROID_VER}
     └── ddk-cnb-dev
 ```
 
 - **ddk-builder** 基于 `ubuntu:25.04`，安装编译内核所需的全部系统依赖
 - **ddk-toolchain** 基于 `ddk-builder`，解压并配置 Clang 工具链，android16-6.12 起同时包含 Rust 工具链
 - **ddk** 基于 `ddk-toolchain`，打包特定 Android 版本的内核源码和预编译 kdir
+- **ddk-min** 基于 `ddk-toolchain`，打包内核源码和精简 kdir（仅 modules_prepare + 头文件），镜像体积更小
 - **ddk-cnb-dev** 基于 `ddk-builder`，加装全部 Clang 工具链和 code-server，用于 CNB 通用云开发
 
 ## 构建命令
@@ -41,6 +44,12 @@ make -C docker build VER=android14-6.1
 
 # 构建全部 DDK 镜像
 make -C docker build-all
+
+# 构建单个精简 DDK 镜像（使用 kdir-min）
+make -C docker build-min VER=android14-6.1
+
+# 构建全部精简 DDK 镜像
+make -C docker build-min-all
 
 # 构建 ddk-cnb-dev 开发镜像
 make -C docker cnb-dev

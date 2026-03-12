@@ -5,6 +5,11 @@
       "docker": "docker.io/ylarod/ddk",
       "cnb": "docker.cnb.cool/ylarod/ddk/ddk"
     },
+    "ddk-min": {
+      "github": "ghcr.io/ylarod/ddk-min",
+      "docker": "docker.io/ylarod/ddk-min",
+      "cnb": "docker.cnb.cool/ylarod/ddk/ddk-min"
+    },
     "ddk-toolchain": {
       "github": "ghcr.io/ylarod/ddk/toolchain",
       "docker": "docker.io/ylarod/ddk-toolchain",
