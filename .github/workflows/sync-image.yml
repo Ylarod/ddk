@@ -13,7 +13,8 @@ jobs:
     name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
+      toolchain-matrix: ${{ steps.generate.outputs.toolchain_matrix }}
+      image-matrix: ${{ steps.generate.outputs.image_matrix }}
       destinations: ${{ steps.check.outputs.destinations }}
     steps:
       - name: Checkout
@@ -40,16 +41,20 @@ jobs:
       - name: Generate matrix
         id: generate
         run: |
-          matrix=$(jq -c '{include:
-            ([.android[] | {project: "ddk", tag: .name}] +
-             [.android[] | {project: "ddk-min", tag: .name}] +
-             ([.matrix[].android] | unique | map({project: "ddk-toolchain", tag: .})))
+          toolchain_matrix=$(jq -c '{include:
+            ([.matrix[].android] | unique | map({project: "ddk-toolchain", tag: .}))
           }' mapping.json)
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          echo "Matrix: $matrix"
+          image_matrix=$(jq -c '{include:
+            ([.android[] | {project: "ddk", tag: .name}] +
+             [.android[] | {project: "ddk-min", tag: .name}])
+          }' mapping.json)
+          echo "toolchain_matrix=$toolchain_matrix" >> "$GITHUB_OUTPUT"
+          echo "image_matrix=$image_matrix" >> "$GITHUB_OUTPUT"
+          echo "Toolchain matrix: $toolchain_matrix"
+          echo "Image matrix: $image_matrix"
 
-  sync:
-    name: ${{ matrix.project }}:${{ matrix.tag }}
+  sync-toolchain:
+    name: toolchain:${{ matrix.tag }}
     needs: prepare
     if: needs.prepare.outputs.destinations != '[]'
     runs-on: ubuntu-latest
@@ -58,7 +63,55 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.prepare.outputs.toolchain-matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo jq
+
+      - name: Login to GHCR
+        if: contains(needs.prepare.outputs.destinations, 'github')
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Login to Docker Hub
+        if: contains(needs.prepare.outputs.destinations, 'docker')
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
+
+      - name: Sync images
+        env:
+          DESTINATIONS: ${{ needs.prepare.outputs.destinations }}
+        run: |
+          for dst in $(echo "$DESTINATIONS" | jq -r '.[]'); do
+            build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }}
+            if [ -n '${{ github.event.inputs.date }}' ]; then
+              build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
+            fi
+          done
+
+  sync-image:
+    name: ${{ matrix.project }}:${{ matrix.tag }}
+    needs: [prepare, sync-toolchain]
+    if: needs.prepare.outputs.destinations != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.image-matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
