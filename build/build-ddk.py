@@ -222,7 +222,7 @@ def build_kernel_modules_prepare(clang_version, android_branch, lto=None, build_
     if build_proc is None:
         build_proc = os.cpu_count() or 1
 
-    run(f"make O={out_path_abs} -j{build_proc} modules_prepare", cwd=src_path, env=env)
+    run(f"make O={out_path_abs} modules_prepare", cwd=src_path, env=env)
 
 
 HEADER_SUFFIXES = {".h", ".hpp", ".hxx", ".h++", ".hh"}
