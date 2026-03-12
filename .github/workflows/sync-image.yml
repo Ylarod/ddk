@@ -15,7 +15,8 @@ jobs:
     outputs:
       toolchain-matrix: ${{ steps.generate.outputs.toolchain_matrix }}
       image-matrix: ${{ steps.generate.outputs.image_matrix }}
-      destinations: ${{ steps.check.outputs.destinations }}
+      has_ghcr: ${{ steps.check.outputs.has_ghcr }}
+      has_docker: ${{ steps.check.outputs.has_docker }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,15 +29,9 @@ jobs:
           HAS_GHCR: ${{ secrets.GHCR_TOKEN != '' }}
           HAS_DOCKER: ${{ secrets.DOCKERHUB_TOKEN != '' }}
         run: |
-          destinations='[]'
-          if [ "$HAS_GHCR" = "true" ]; then
-            destinations=$(echo "$destinations" | jq -c '. + ["github"]')
-          fi
-          if [ "$HAS_DOCKER" = "true" ]; then
-            destinations=$(echo "$destinations" | jq -c '. + ["docker"]')
-          fi
-          echo "destinations=$destinations" >> "$GITHUB_OUTPUT"
-          echo "Sync destinations: $destinations"
+          echo "has_ghcr=$HAS_GHCR" >> "$GITHUB_OUTPUT"
+          echo "has_docker=$HAS_DOCKER" >> "$GITHUB_OUTPUT"
+          echo "GHCR: $HAS_GHCR, Docker Hub: $HAS_DOCKER"
 
       - name: Generate matrix
         id: generate
@@ -53,10 +48,11 @@ jobs:
           echo "Toolchain matrix: $toolchain_matrix"
           echo "Image matrix: $image_matrix"
 
-  sync-toolchain:
-    name: toolchain:${{ matrix.tag }}
+  # Phase 1: CNB → GitHub
+  sync-toolchain-to-github:
+    name: cnb→github toolchain:${{ matrix.tag }}
     needs: prepare
-    if: needs.prepare.outputs.destinations != '[]'
+    if: needs.prepare.outputs.has_ghcr == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,35 +72,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends skopeo jq
 
       - name: Login to GHCR
-        if: contains(needs.prepare.outputs.destinations, 'github')
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
           echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
 
-      - name: Login to Docker Hub
-        if: contains(needs.prepare.outputs.destinations, 'docker')
-        env:
-          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
-
       - name: Sync images
-        env:
-          DESTINATIONS: ${{ needs.prepare.outputs.destinations }}
         run: |
-          for dst in $(echo "$DESTINATIONS" | jq -r '.[]'); do
-            build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }}
-            if [ -n '${{ github.event.inputs.date }}' ]; then
-              build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
-            fi
-          done
+          build/sync-image.sh -s cnb -d github -p ${{ matrix.project }} -t ${{ matrix.tag }}
+          if [ -n '${{ github.event.inputs.date }}' ]; then
+            build/sync-image.sh -s cnb -d github -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
+          fi
 
-  sync-image:
-    name: ${{ matrix.project }}:${{ matrix.tag }}
-    needs: [prepare, sync-toolchain]
-    if: needs.prepare.outputs.destinations != '[]'
+  sync-image-to-github:
+    name: cnb→github ${{ matrix.project }}:${{ matrix.tag }}
+    needs: [prepare, sync-toolchain-to-github]
+    if: needs.prepare.outputs.has_ghcr == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,14 +107,48 @@ jobs:
           sudo apt-get install -y --no-install-recommends skopeo jq
 
       - name: Login to GHCR
-        if: contains(needs.prepare.outputs.destinations, 'github')
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Sync images
+        run: |
+          build/sync-image.sh -s cnb -d github -p ${{ matrix.project }} -t ${{ matrix.tag }}
+          if [ -n '${{ github.event.inputs.date }}' ]; then
+            build/sync-image.sh -s cnb -d github -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
+          fi
+
+  # Phase 2: GitHub → Docker Hub
+  sync-toolchain-to-docker:
+    name: github→docker toolchain:${{ matrix.tag }}
+    needs: [prepare, sync-toolchain-to-github]
+    if: needs.prepare.outputs.has_ghcr == 'true' && needs.prepare.outputs.has_docker == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.toolchain-matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo jq
+
+      - name: Login to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
           echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Login to Docker Hub
-        if: contains(needs.prepare.outputs.destinations, 'docker')
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -139,12 +156,50 @@ jobs:
           echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
 
       - name: Sync images
-        env:
-          DESTINATIONS: ${{ needs.prepare.outputs.destinations }}
         run: |
-          for dst in $(echo "$DESTINATIONS" | jq -r '.[]'); do
-            build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }}
-            if [ -n '${{ github.event.inputs.date }}' ]; then
-              build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
-            fi
-          done
+          build/sync-image.sh -s github -d docker -p ${{ matrix.project }} -t ${{ matrix.tag }}
+          if [ -n '${{ github.event.inputs.date }}' ]; then
+            build/sync-image.sh -s github -d docker -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
+          fi
+
+  sync-image-to-docker:
+    name: github→docker ${{ matrix.project }}:${{ matrix.tag }}
+    needs: [prepare, sync-image-to-github, sync-toolchain-to-docker]
+    if: needs.prepare.outputs.has_ghcr == 'true' && needs.prepare.outputs.has_docker == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.image-matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo jq
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Login to Docker Hub
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
+
+      - name: Sync images
+        run: |
+          build/sync-image.sh -s github -d docker -p ${{ matrix.project }} -t ${{ matrix.tag }}
+          if [ -n '${{ github.event.inputs.date }}' ]; then
+            build/sync-image.sh -s github -d docker -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
+          fi
