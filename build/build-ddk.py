@@ -139,30 +139,20 @@ def _drain_output(proc, tag):
     sys.stdout.flush()
 
 
-def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None):
-    """配置并启动内核编译，返回 (Popen, tag) 或 None（已跳过）"""
-    out_path = DDK_ROOT / "kdir" / android_branch
-    if out_path.is_dir():
-        print(f"[!] {android_branch} already exists, skip")
-        return None
-
+def _make_kernel_env(clang_version):
+    """构造内核编译所需的环境变量"""
     clang_bin = (DDK_ROOT / "clang" / clang_version / "bin").resolve()
-    src_path = DDK_ROOT / "src" / android_branch
-
-    if not src_path.is_dir():
-        print(f"[x] 源码目录不存在: {src_path}")
-        sys.exit(1)
-
-    print(f"[+] Building {android_branch}")
-
     env = os.environ.copy()
     env["PATH"] = f"{clang_bin}:{env['PATH']}"
     env["CROSS_COMPILE"] = "aarch64-linux-gnu-"
     env["ARCH"] = "arm64"
     env["LLVM"] = "1"
     env["LLVM_IAS"] = "1"
+    return env
 
-    out_path_abs = out_path.resolve()
+
+def _configure_kernel(src_path, out_path_abs, env, lto=None, android_branch=None):
+    """defconfig + LTO 配置"""
     run(f"make O={out_path_abs} gki_defconfig", cwd=src_path, env=env)
 
     scripts_config = src_path / "scripts" / "config"
@@ -177,6 +167,26 @@ def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None)
     if android_branch == "android16-6.12":
         run(f"{scripts_config} --file {config_file} -e CONFIG_CFI_ICALL_NORMALIZE_INTEGERS", env=env)
 
+
+def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None):
+    """配置并启动内核编译，返回 (Popen, tag) 或 None（已跳过）"""
+    out_path = DDK_ROOT / "kdir" / android_branch
+    if out_path.is_dir():
+        print(f"[!] {android_branch} already exists, skip")
+        return None
+
+    src_path = DDK_ROOT / "src" / android_branch
+    if not src_path.is_dir():
+        print(f"[x] 源码目录不存在: {src_path}")
+        sys.exit(1)
+
+    print(f"[+] Building {android_branch}")
+
+    env = _make_kernel_env(clang_version)
+    out_path_abs = out_path.resolve()
+    out_path.mkdir(parents=True, exist_ok=True)
+    _configure_kernel(src_path, out_path_abs, env, lto=lto, android_branch=android_branch)
+
     if build_proc is None:
         build_proc = os.cpu_count() or 1
 
@@ -188,6 +198,82 @@ def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None)
         text=True, bufsize=1,
     )
     return proc, android_branch
+
+
+def build_kernel_modules_prepare(clang_version, android_branch, lto=None, build_proc=None):
+    """仅执行 modules_prepare（生成精简 kdir）"""
+    out_path = DDK_ROOT / "kdir" / android_branch
+    if out_path.is_dir():
+        print(f"[!] {android_branch} already exists, skip modules_prepare")
+        return
+
+    src_path = DDK_ROOT / "src" / android_branch
+    if not src_path.is_dir():
+        print(f"[x] 源码目录不存在: {src_path}")
+        sys.exit(1)
+
+    print(f"[+] modules_prepare {android_branch}")
+
+    env = _make_kernel_env(clang_version)
+    out_path_abs = out_path.resolve()
+    out_path.mkdir(parents=True, exist_ok=True)
+    _configure_kernel(src_path, out_path_abs, env, lto=lto, android_branch=android_branch)
+
+    if build_proc is None:
+        build_proc = os.cpu_count() or 1
+
+    run(f"make O={out_path_abs} -j{build_proc} modules_prepare", cwd=src_path, env=env)
+
+
+HEADER_SUFFIXES = {".h", ".hpp", ".hxx", ".h++", ".hh"}
+
+# 构建外部内核模块所需的顶层文件
+BUILD_FILES = [
+    "Module.symvers",
+    "vmlinux",
+    "vmlinux.symvers",
+    "System.map",
+    "modules.order",
+    "modules.builtin",
+    "modules.builtin.modinfo",
+]
+
+
+def fix_kdir_min(kdir_full: Path, kdir_min: Path):
+    """从完整构建目录拷贝缺失的头文件和构建文件到精简目录"""
+    for kernel_full in sorted(kdir_full.iterdir()):
+        if not kernel_full.is_dir():
+            continue
+        kernel_min = kdir_min / kernel_full.name
+        if not kernel_min.is_dir():
+            continue
+
+        print(f"[+] 修补 kdir-min: {kernel_full.name}")
+
+        # 拷贝构建文件
+        for name in BUILD_FILES:
+            src_file = kernel_full / name
+            dst_file = kernel_min / name
+            if not src_file.is_file() or dst_file.exists():
+                continue
+            shutil.copy2(src_file, dst_file)
+            print(f"  复制构建文件: {name}")
+
+        # 拷贝缺失的头文件
+        header_copied = 0
+        for src_file in kernel_full.rglob("*"):
+            if not src_file.is_file():
+                continue
+            if src_file.suffix.lower() not in HEADER_SUFFIXES:
+                continue
+            rel = src_file.relative_to(kernel_full)
+            dst_file = kernel_min / rel
+            if dst_file.exists():
+                continue
+            dst_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dst_file)
+            header_copied += 1
+        print(f"  复制 {header_copied} 个头文件")
 
 
 def build_kernels(matrix_list, lto=None, build_proc=None):
@@ -314,6 +400,28 @@ def cmd_build(args):
     print("[+] Build kernel")
     build_kernels(matrix_list, lto=args.lto, build_proc=args.jobs)
 
+    if args.min:
+        kdir = DDK_ROOT / "kdir"
+        kdir_full = DDK_ROOT / "kdir-full"
+
+        # mv kdir -> kdir-full
+        if kdir.is_dir():
+            if kdir_full.is_dir():
+                shutil.rmtree(kdir_full)
+            print(f"[+] mv {kdir} -> {kdir_full}")
+            kdir.rename(kdir_full)
+
+        # 构建 modules_prepare -> kdir（精简版）
+        for item in matrix_list:
+            clang_ver = item.get("clang")
+            android_ver = item.get("android")
+            if clang_ver and android_ver:
+                build_kernel_modules_prepare(clang_ver, android_ver,
+                                             lto=args.lto, build_proc=args.jobs)
+
+        # 从 kdir-full 修补 kdir
+        fix_kdir_min(kdir_full, kdir)
+
 
 def cmd_rebuild(args):
     if not DDK_ROOT.is_dir():
@@ -373,6 +481,8 @@ def main():
     p_build = sub.add_parser("build", help="编译内核")
     add_common_args(p_build)
     add_android_arg(p_build)
+    p_build.add_argument("--min", action="store_true",
+                         help="同时构建 kdir-min（modules_prepare + 修补头文件和构建文件）")
 
     # setup-toolchain - clang + rust
     p_tc = sub.add_parser("setup-toolchain", help="安装工具链 (clang + rust)")

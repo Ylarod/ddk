@@ -6,6 +6,7 @@
 #   -r, --rust        打包 rust/*
 #   -s, --src         打包 src/*
 #   -k, --kdir        打包 kdir/*
+#   -m, --kdir-min    打包 kdir/*（从 --min 构建的精简 kdir）到 prebuilts/kdir-min/
 #   -v, --version     指定版本子目录名（如 r530983）
 #   （不带参数则执行全部打包）
 #
@@ -52,21 +53,22 @@ pack_dir() {
 pack_group() {
     local prefix="$1"
     local version="$2"
+    local out_prefix="${3:-$prefix}"  # 输出目录前缀，默认与 prefix 相同
     local base_dir="$ROOT/$prefix"
 
-    echo "📦 Packing $prefix directories..."
+    echo "📦 Packing $prefix directories (-> prebuilts/$out_prefix)..."
 
     if [[ -n "$version" ]]; then
         local d="$base_dir/$version"
         if [[ -d "$d" ]]; then
-            pack_dir "$prefix" "$base_dir" "$version"
+            pack_dir "$out_prefix" "$base_dir" "$version"
         else
             echo "⚠️  Skipping $prefix: $version not found under $base_dir"
         fi
     else
         for d in "$base_dir"/*; do
             [[ -d "$d" ]] || continue
-            pack_dir "$prefix" "$base_dir" "$(basename "$d")"
+            pack_dir "$out_prefix" "$base_dir" "$(basename "$d")"
         done
     fi
 }
@@ -74,6 +76,7 @@ pack_group() {
 main() {
     local do_src=false
     local do_kdir=false
+    local do_kdir_min=false
     local do_clang=false
     local do_rust=false
     local version=""
@@ -88,6 +91,7 @@ main() {
             case "$1" in
                 -s|--src) do_src=true ;;
                 -k|--kdir) do_kdir=true ;;
+                -m|--kdir-min) do_kdir_min=true ;;
                 -c|--clang) do_clang=true ;;
                 -r|--rust) do_rust=true ;;
                 -v|--version)
@@ -109,6 +113,7 @@ main() {
 
     $do_src && pack_group "src" "$version"
     $do_kdir && pack_group "kdir" "$version"
+    $do_kdir_min && pack_group "kdir" "$version" "kdir-min"
     $do_clang && pack_group "clang" "$version"
     $do_rust && pack_group "rust" "$version"
 
