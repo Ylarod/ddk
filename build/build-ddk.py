@@ -304,51 +304,15 @@ def cmd_setup_src(args):
 
 
 def cmd_build(args):
-    """完整构建：clang + src + build"""
+    """编译内核"""
     mapping = load_mapping(args.map_file)
-    ensure_ddk_root()
 
-    lock_file = DDK_ROOT / "setup.lock"
-    if not args.android and lock_file.is_file():
-        print("[!] Already setup, skip")
-        return
-
+    matrix_list = mapping.get("matrix", [])
     if args.android:
-        clang_list, rust_list = filter_toolchains(mapping, args.android)
-        android_list = [a for a in mapping.get("android", []) if a["name"] == args.android]
-        matrix_list = [m for m in mapping.get("matrix", []) if m.get("android") == args.android]
-    else:
-        clang_list = mapping.get("clang", [])
-        rust_list = mapping.get("rust", [])
-        android_list = mapping.get("android", [])
-        matrix_list = mapping.get("matrix", [])
-
-    print("[+] Setup clang")
-    for item in clang_list:
-        if args.source == "prebuilt":
-            setup_clang_prebuilt(item["version"])
-        else:
-            setup_clang_download(item["branch"], item["version"])
-
-    print("[+] Setup rust")
-    for item in rust_list:
-        if args.source == "prebuilt":
-            setup_rust_prebuilt(item["version"])
-        else:
-            setup_rust_download(item["version"], item["branch"], item["repo"])
-
-    print("[+] Setup kernel source")
-    for item in android_list:
-        if args.source == "prebuilt":
-            setup_source_prebuilt(item["name"])
-        else:
-            setup_source_download(item["name"], item.get("branch"))
+        matrix_list = [m for m in matrix_list if m.get("android") == args.android]
 
     print("[+] Build kernel")
     build_kernels(matrix_list, lto=args.lto, build_proc=args.jobs)
-
-    if not args.android:
-        lock_file.touch()
 
 
 def cmd_rebuild(args):
@@ -405,10 +369,9 @@ def main():
     parser = argparse.ArgumentParser(description="DDK 构建工具")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # build - 完整构建
-    p_build = sub.add_parser("build", help="完整构建：下载/解压 clang + 源码，编译内核")
+    # build - 编译内核
+    p_build = sub.add_parser("build", help="编译内核")
     add_common_args(p_build)
-    add_source_arg(p_build)
     add_android_arg(p_build)
 
     # setup-toolchain - clang + rust
