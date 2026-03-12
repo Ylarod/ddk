@@ -9,12 +9,56 @@ on:
         default: ""
 
 jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+      destinations: ${{ steps.check.outputs.destinations }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check available credentials
+        id: check
+        env:
+          HAS_GHCR: ${{ secrets.GHCR_TOKEN != '' }}
+          HAS_DOCKER: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        run: |
+          destinations='[]'
+          if [ "$HAS_GHCR" = "true" ]; then
+            destinations=$(echo "$destinations" | jq -c '. + ["github"]')
+          fi
+          if [ "$HAS_DOCKER" = "true" ]; then
+            destinations=$(echo "$destinations" | jq -c '. + ["docker"]')
+          fi
+          echo "destinations=$destinations" >> "$GITHUB_OUTPUT"
+          echo "Sync destinations: $destinations"
+
+      - name: Generate matrix
+        id: generate
+        run: |
+          matrix=$(jq -c '{include:
+            ([.android[] | {project: "ddk", tag: .name}] +
+             [.android[] | {project: "ddk-min", tag: .name}] +
+             ([.matrix[].android] | unique | map({project: "ddk-toolchain", tag: .})))
+          }' mapping.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Matrix: $matrix"
+
   sync:
-    name: Sync images from CNB to GHCR & Docker Hub
+    name: ${{ matrix.project }}:${{ matrix.tag }}
+    needs: prepare
+    if: needs.prepare.outputs.destinations != '[]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,123 +71,27 @@ jobs:
           sudo apt-get install -y --no-install-recommends skopeo jq
 
       - name: Login to GHCR
+        if: contains(needs.prepare.outputs.destinations, 'github')
         env:
-          GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         run: |
-          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "$GHCR_USER" --password-stdin
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Login to Docker Hub
+        if: contains(needs.prepare.outputs.destinations, 'docker')
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_PASS}" ]; then
-            echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
-          else
-            echo "[WARN] 未配置 Docker Hub 凭据，跳过登录"
-          fi
+          echo "$DOCKERHUB_PASS" | skopeo login docker.io --username "$DOCKERHUB_USER" --password-stdin
 
-      - name: Sync images directly
+      - name: Sync images
+        env:
+          DESTINATIONS: ${{ needs.prepare.outputs.destinations }}
         run: |
-          set -euo pipefail
-          # 固定使用 cnb 作为源
-          src_key="cnb"
-          echo "使用源: ${src_key}"
-          date_input='${{ github.event.inputs.date }}'
-          if [ -n "$date_input" ]; then
-            echo "使用日期后缀: $date_input"
-          else
-            echo "未指定日期后缀"
-          fi
-          # 读取 registry 映射
-          ghcr_repo=$(jq -r '.registry["ddk"].github' mapping.json)
-          docker_repo=$(jq -r '.registry["ddk"].docker' mapping.json)
-          cnb_repo=$(jq -r '.registry["ddk"].cnb' mapping.json)
-          ghcr_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].github' mapping.json)
-          docker_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].docker' mapping.json)
-          cnb_toolchain_repo=$(jq -r '.registry["ddk-toolchain"].cnb' mapping.json)
-
-          # 选择源
-          src_ddk="$cnb_repo"; src_toolchain="$cnb_toolchain_repo"
-
-          # ddk 标签：来自 mapping.json.android[].name
-          echo "[INFO] 从 mapping.json 收集 ddk 标签"
-          ddk_count=$(jq -r '.android | length' mapping.json)
-          echo "ddk 标签数量: $ddk_count"
-          while read -r tag; do
-            echo "[DEBUG] ddk tag: $tag"
-            name="ddk:$tag"
-            src="$src_ddk:$tag"
-            dst_ghcr="$ghcr_repo:$tag"
-            dst_dock="$docker_repo:$tag"
-            echo "=== 同步 $name ==="
-            echo "源: $src"
-            echo "→ GHCR: $dst_ghcr"
-            echo "→ Docker: $dst_dock"
-            skopeo copy --all docker://$src docker://$dst_ghcr
-            if skopeo login --get-login docker.io >/dev/null 2>&1; then
-              skopeo copy --all docker://$src docker://$dst_dock
-            else
-              echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock"
+          for dst in $(echo "$DESTINATIONS" | jq -r '.[]'); do
+            build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }}
+            if [ -n '${{ github.event.inputs.date }}' ]; then
+              build/sync-image.sh -s cnb -d "$dst" -p ${{ matrix.project }} -t ${{ matrix.tag }} --new-date '${{ github.event.inputs.date }}'
             fi
-
-            # 若指定日期，则添加额外的日期标签项（源使用原标签，目标标签追加 -$date）
-            if [ -n "$date_input" ]; then
-              echo "[DEBUG] ddk tag with date: ${tag}-$date_input"
-              name_date="ddk:${tag}-$date_input"
-              dst_ghcr_date="$ghcr_repo:${tag}-$date_input"
-              dst_dock_date="$docker_repo:${tag}-$date_input"
-              echo "=== 同步 $name_date ==="
-              echo "源: $src"
-              echo "→ GHCR: $dst_ghcr_date"
-              echo "→ Docker: $dst_dock_date"
-              skopeo copy --all docker://$src docker://$dst_ghcr_date
-              if skopeo login --get-login docker.io >/dev/null 2>&1; then
-                skopeo copy --all docker://$src docker://$dst_dock_date
-              else
-                echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock_date"
-              fi
-            fi
-          done < <(jq -r '.android[].name' mapping.json)
-
-          # ddk-toolchain 标签：来自 mapping.json.clang[].version
-          echo "[INFO] 从 mapping.json 收集 ddk-toolchain 标签"
-          clang_count=$(jq -r '.clang | length' mapping.json)
-          echo "ddk-toolchain 标签数量: $clang_count"
-          while read -r tag; do
-            echo "[DEBUG] toolchain tag: $tag"
-            name="ddk-toolchain:$tag"
-            src="$src_toolchain:$tag"
-            dst_ghcr="$ghcr_toolchain_repo:$tag"
-            dst_dock="$docker_toolchain_repo:$tag"
-            echo "=== 同步 $name ==="
-            echo "源: $src"
-            echo "→ GHCR: $dst_ghcr"
-            echo "→ Docker: $dst_dock"
-            skopeo copy --all docker://$src docker://$dst_ghcr
-            if skopeo login --get-login docker.io >/dev/null 2>&1; then
-              skopeo copy --all docker://$src docker://$dst_dock
-            else
-              echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock"
-            fi
-
-            if [ -n "$date_input" ]; then
-              echo "[DEBUG] toolchain tag with date: ${tag}-$date_input"
-              name_date="ddk-toolchain:${tag}-$date_input"
-              dst_ghcr_date="$ghcr_toolchain_repo:${tag}-$date_input"
-              dst_dock_date="$docker_toolchain_repo:${tag}-$date_input"
-              echo "=== 同步 $name_date ==="
-              echo "源: $src"
-              echo "→ GHCR: $dst_ghcr_date"
-              echo "→ Docker: $dst_dock_date"
-              skopeo copy --all docker://$src docker://$dst_ghcr_date
-              if skopeo login --get-login docker.io >/dev/null 2>&1; then
-                skopeo copy --all docker://$src docker://$dst_dock_date
-              else
-                echo "[WARN] 未登录 Docker Hub，跳过 $dst_dock_date"
-              fi
-            fi
-          done < <(jq -r '.clang[].version' mapping.json)
-
-          echo "同步完成。源 → GHCR 与（可选）Docker Hub。" | tee -a $GITHUB_STEP_SUMMARY
+          done

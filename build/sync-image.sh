@@ -8,6 +8,7 @@ MAPPING_FILE="${MAPPING_FILE:-$SCRIPT_DIR/../mapping.json}"
 SRC_REGISTRY_TYPE=""
 DST_REGISTRY_TYPE=""
 PROJECT="all"
+TAG_FILTER=""
 DRY_RUN=false
 USE_DATE=""
 NEW_DATE=""
@@ -23,7 +24,8 @@ Sync container images between registries using skopeo.
 OPTIONS:
   -s, --src <registry>     Source registry type (github|docker|cnb) [REQUIRED]
   -d, --dst <registry>     Destination registry type (github|docker|cnb) [REQUIRED]
-  -p, --project <name>     Project to sync (ddk|ddk-toolchain|ddk-clang|all) [default: all]
+  -p, --project <name>     Project to sync (ddk|ddk-min|ddk-toolchain|ddk-clang|all) [default: all]
+  -t, --tag <tag>          Only sync this specific tag [default: sync all tags]
   -m, --mapping <file>     Path to mapping.json file [default: ./mapping.json]
   --date <date>            Sync images with date tag (src:ver-date -> dst:ver-date)
   --new-date <date>        Add new date tag to destination (src:ver -> dst:ver-newdate)
@@ -40,6 +42,7 @@ EXAMPLES:
   $0 -s github -d cnb --date 20250101             # Sync: src:ver-20250101 -> dst:ver-20250101
   $0 -s github -d docker --new-date 20250101      # Sync: src:ver -> dst:ver-20250101
   $0 -s github -d cnb -p ddk --dry-run            # Preview sync for ddk only
+  $0 -s cnb -d github -p ddk -t android14-6.1     # Sync single tag
 
 EOF
   exit 0
@@ -57,6 +60,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -p|--project)
       PROJECT="$2"
+      shift 2
+      ;;
+    -t|--tag)
+      TAG_FILTER="$2"
       shift 2
       ;;
     -m|--mapping)
@@ -141,9 +148,9 @@ validate_registry_type "$SRC_REGISTRY_TYPE" "source"
 validate_registry_type "$DST_REGISTRY_TYPE" "destination"
 
 # Validate project
-if [[ "$PROJECT" != "all" && "$PROJECT" != "ddk" && "$PROJECT" != "ddk-toolchain" && "$PROJECT" != "ddk-clang" ]]; then
+if [[ "$PROJECT" != "all" && "$PROJECT" != "ddk" && "$PROJECT" != "ddk-min" && "$PROJECT" != "ddk-toolchain" && "$PROJECT" != "ddk-clang" ]]; then
   echo "Error: Invalid project: $PROJECT"
-  echo "Valid projects: ddk, ddk-toolchain, ddk-clang, all"
+  echo "Valid projects: ddk, ddk-min, ddk-toolchain, ddk-clang, all"
   exit 1
 fi
 
@@ -157,6 +164,7 @@ echo "Registry Image Sync Tool"
 echo "   Source: $SRC_REGISTRY_TYPE"
 echo "   Destination: $DST_REGISTRY_TYPE"
 echo "   Project: $PROJECT"
+echo "   Tag: ${TAG_FILTER:-all}"
 echo "   Mapping: $MAPPING_FILE"
 
 # Determine tag mode
@@ -223,12 +231,15 @@ sync_image() {
 # Get registry URLs from mapping.json
 SRC_REGISTRY_DDK=$(jq -r ".registry.ddk.$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
 DST_REGISTRY_DDK=$(jq -r ".registry.ddk.$DST_REGISTRY_TYPE" "$MAPPING_FILE")
+SRC_REGISTRY_DDK_MIN=$(jq -r ".registry[\"ddk-min\"].$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
+DST_REGISTRY_DDK_MIN=$(jq -r ".registry[\"ddk-min\"].$DST_REGISTRY_TYPE" "$MAPPING_FILE")
 SRC_REGISTRY_TOOLCHAIN=$(jq -r ".registry[\"ddk-toolchain\"].$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
 DST_REGISTRY_TOOLCHAIN=$(jq -r ".registry[\"ddk-toolchain\"].$DST_REGISTRY_TYPE" "$MAPPING_FILE")
 SRC_REGISTRY_CLANG=$(jq -r ".registry[\"ddk-clang\"].$SRC_REGISTRY_TYPE" "$MAPPING_FILE")
 DST_REGISTRY_CLANG=$(jq -r ".registry[\"ddk-clang\"].$DST_REGISTRY_TYPE" "$MAPPING_FILE")
 
 echo "   DDK: $SRC_REGISTRY_DDK -> $DST_REGISTRY_DDK"
+echo "   DDK-Min: $SRC_REGISTRY_DDK_MIN -> $DST_REGISTRY_DDK_MIN"
 echo "   Toolchain: $SRC_REGISTRY_TOOLCHAIN -> $DST_REGISTRY_TOOLCHAIN"
 echo "   Clang (deprecated): $SRC_REGISTRY_CLANG -> $DST_REGISTRY_CLANG"
 echo
@@ -236,10 +247,12 @@ echo
 # Process toolchain images
 if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-toolchain" ]]; then
   echo "Processing toolchain images..."
-  toolchain_android_tags=$(jq -r '.matrix[].android' "$MAPPING_FILE")
-
-  # Convert to arrays
-  IFS=$'\n' read -d '' -r -a toolchain_android_array <<< "$toolchain_android_tags" || true
+  if [[ -n "$TAG_FILTER" ]]; then
+    toolchain_android_array=("$TAG_FILTER")
+  else
+    toolchain_android_tags=$(jq -r '.matrix[].android' "$MAPPING_FILE")
+    IFS=$'\n' read -d '' -r -a toolchain_android_array <<< "$toolchain_android_tags" || true
+  fi
 
   for android_tag in "${toolchain_android_array[@]}"; do
     if [[ -z "$android_tag" || "$android_tag" == "null" ]]; then
@@ -254,18 +267,15 @@ fi
 # Process clang images (deprecated, kept for backward compatibility)
 if [[ "$PROJECT" == "ddk-clang" ]]; then
   echo "Processing clang images (deprecated)..."
-  clang_versions=$(jq -r '.clang[].version' "$MAPPING_FILE")
-  clang_branches=$(jq -r '.clang[].branch' "$MAPPING_FILE")
+  if [[ -n "$TAG_FILTER" ]]; then
+    clang_version_array=("$TAG_FILTER")
+  else
+    clang_versions=$(jq -r '.clang[].version' "$MAPPING_FILE")
+    IFS=$'\n' read -d '' -r -a clang_version_array <<< "$clang_versions" || true
+  fi
 
-  # Convert to arrays
-  IFS=$'\n' read -d '' -r -a clang_version_array <<< "$clang_versions" || true
-  IFS=$'\n' read -d '' -r -a clang_branch_array <<< "$clang_branches" || true
-
-  for i in "${!clang_version_array[@]}"; do
-    version="${clang_version_array[$i]}"
-    branch="${clang_branch_array[$i]}"
-
-    echo "[Clang] ${version} (${branch}) (deprecated)"
+  for version in "${clang_version_array[@]}"; do
+    echo "[Clang] ${version} (deprecated)"
     sync_image "$SRC_REGISTRY_CLANG" "$DST_REGISTRY_CLANG" "$version" || echo "WARNING: Failed to sync ${version}"
   done
 fi
@@ -273,16 +283,32 @@ fi
 # Process android images
 if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk" ]]; then
   echo "Processing android (ddk) images..."
-  android_names=$(jq -r '.android[].name' "$MAPPING_FILE")
+  if [[ -n "$TAG_FILTER" ]]; then
+    android_name_array=("$TAG_FILTER")
+  else
+    android_names=$(jq -r '.android[].name' "$MAPPING_FILE")
+    IFS=$'\n' read -d '' -r -a android_name_array <<< "$android_names" || true
+  fi
 
-  # Convert to arrays
-  IFS=$'\n' read -d '' -r -a android_name_array <<< "$android_names" || true
-
-  for i in "${!android_name_array[@]}"; do
-    name="${android_name_array[$i]}"
-
-    echo "[Android] ${name} -> ${name}"
+  for name in "${android_name_array[@]}"; do
+    echo "[Android] ${name}"
     sync_image "$SRC_REGISTRY_DDK" "$DST_REGISTRY_DDK" "$name" || echo "WARNING: Failed to sync ${name}"
+  done
+fi
+
+# Process android images (ddk-min)
+if [[ "$PROJECT" == "all" || "$PROJECT" == "ddk-min" ]]; then
+  echo "Processing android (ddk-min) images..."
+  if [[ -n "$TAG_FILTER" ]]; then
+    android_name_array=("$TAG_FILTER")
+  else
+    android_names=$(jq -r '.android[].name' "$MAPPING_FILE")
+    IFS=$'\n' read -d '' -r -a android_name_array <<< "$android_names" || true
+  fi
+
+  for name in "${android_name_array[@]}"; do
+    echo "[Android-Min] ${name}"
+    sync_image "$SRC_REGISTRY_DDK_MIN" "$DST_REGISTRY_DDK_MIN" "$name" || echo "WARNING: Failed to sync ${name}"
   done
 fi
 
