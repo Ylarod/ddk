@@ -139,11 +139,17 @@ def _drain_output(proc, tag):
     sys.stdout.flush()
 
 
-def _make_kernel_env(clang_version):
+def _make_kernel_env(clang_version, rust_version=None):
     """构造内核编译所需的环境变量"""
     clang_bin = (DDK_ROOT / "clang" / clang_version / "bin").resolve()
     env = os.environ.copy()
-    env["PATH"] = f"{clang_bin}:{env['PATH']}"
+    path_parts = [str(clang_bin)]
+    if rust_version:
+        rust_bin = (DDK_ROOT / "rust" / rust_version / "bin").resolve()
+        if rust_bin.is_dir():
+            path_parts.append(str(rust_bin))
+    path_parts.append(env["PATH"])
+    env["PATH"] = ":".join(path_parts)
     env["CROSS_COMPILE"] = "aarch64-linux-gnu-"
     env["ARCH"] = "arm64"
     env["LLVM"] = "1"
@@ -168,7 +174,7 @@ def _configure_kernel(src_path, out_path_abs, env, lto=None, android_branch=None
         run(f"{scripts_config} --file {config_file} -e CONFIG_CFI_ICALL_NORMALIZE_INTEGERS", env=env)
 
 
-def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None):
+def build_kernel_start(clang_version, android_branch, rust_version=None, lto=None, build_proc=None):
     """配置并启动内核编译，返回 (Popen, tag) 或 None（已跳过）"""
     out_path = DDK_ROOT / "kdir" / android_branch
     if out_path.is_dir():
@@ -182,7 +188,7 @@ def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None)
 
     print(f"[+] Building {android_branch}")
 
-    env = _make_kernel_env(clang_version)
+    env = _make_kernel_env(clang_version, rust_version)
     out_path_abs = out_path.resolve()
     out_path.mkdir(parents=True, exist_ok=True)
     _configure_kernel(src_path, out_path_abs, env, lto=lto, android_branch=android_branch)
@@ -200,7 +206,7 @@ def build_kernel_start(clang_version, android_branch, lto=None, build_proc=None)
     return proc, android_branch
 
 
-def build_kernel_modules_prepare(clang_version, android_branch, lto=None, build_proc=None):
+def build_kernel_modules_prepare(clang_version, android_branch, rust_version=None, lto=None, build_proc=None):
     """仅执行 modules_prepare（生成精简 kdir）"""
     out_path = DDK_ROOT / "kdir" / android_branch
     if out_path.is_dir():
@@ -214,7 +220,7 @@ def build_kernel_modules_prepare(clang_version, android_branch, lto=None, build_
 
     print(f"[+] modules_prepare {android_branch}")
 
-    env = _make_kernel_env(clang_version)
+    env = _make_kernel_env(clang_version, rust_version)
     out_path_abs = out_path.resolve()
     out_path.mkdir(parents=True, exist_ok=True)
     _configure_kernel(src_path, out_path_abs, env, lto=lto, android_branch=android_branch)
@@ -283,10 +289,11 @@ def build_kernels(matrix_list, lto=None, build_proc=None):
     for i, item in enumerate(matrix_list):
         clang_ver = item.get("clang")
         android_ver = item.get("android")
+        rust_ver = item.get("rust")
         if not clang_ver or not android_ver:
             continue
 
-        result = build_kernel_start(clang_ver, android_ver, lto=lto, build_proc=build_proc)
+        result = build_kernel_start(clang_ver, android_ver, rust_version=rust_ver, lto=lto, build_proc=build_proc)
         if result is None:
             continue
 
@@ -415,8 +422,10 @@ def cmd_build(args):
         for item in matrix_list:
             clang_ver = item.get("clang")
             android_ver = item.get("android")
+            rust_ver = item.get("rust")
             if clang_ver and android_ver:
                 build_kernel_modules_prepare(clang_ver, android_ver,
+                                             rust_version=rust_ver,
                                              lto=args.lto, build_proc=args.jobs)
 
         # 从 kdir-full 修补 kdir

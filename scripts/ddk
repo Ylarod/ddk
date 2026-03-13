@@ -474,6 +474,19 @@ get_clang_for_target() {
   echo "$clang"
 }
 
+get_rust_for_target() {
+  local target=$1
+
+  if [[ ! -f "$DDK_MAPPING_JSON" ]]; then
+    return 0
+  fi
+
+  local rust
+  rust=$(jq -r ".matrix[] | select(.android == \"$target\") | .rust // empty" "$DDK_MAPPING_JSON")
+
+  echo "$rust"
+}
+
 # Setup local build environment variables
 # Args:
 #   $1 - Android target name
@@ -487,9 +500,10 @@ get_clang_for_target() {
 #   Call restore_local_env() after use to cleanup
 setup_local_env() {
   local target=$1
-  local clang
+  local clang rust
 
   clang=$(get_clang_for_target "$target")
+  rust=$(get_rust_for_target "$target")
 
   # Backup PATH
   export DDK_ORIGINAL_PATH="$PATH"
@@ -498,6 +512,15 @@ setup_local_env() {
   export KDIR="$DDK_ROOT/kdir/$target"
   export CLANG_PATH="$DDK_ROOT/clang/$clang/bin"
   export PATH="$CLANG_PATH:$PATH"
+
+  # Setup Rust if available
+  if [[ -n "$rust" ]]; then
+    export RUST_PATH="$DDK_ROOT/rust/$rust/bin"
+    if [[ -d "$RUST_PATH" ]]; then
+      export PATH="$RUST_PATH:$PATH"
+    fi
+  fi
+
   export CROSS_COMPILE=aarch64-linux-gnu-
   export ARCH=arm64
   export LLVM=1
@@ -524,6 +547,9 @@ setup_local_env() {
   echo "Environment setup:"
   echo "  KDIR=$KDIR"
   echo "  CLANG_PATH=$CLANG_PATH"
+  if [[ -n "${RUST_PATH:-}" ]]; then
+    echo "  RUST_PATH=$RUST_PATH"
+  fi
   echo "  ARCH=$ARCH"
   if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
     echo "  Custom env vars:"
@@ -547,6 +573,7 @@ restore_local_env() {
   # Unset DDK-specific variables
   unset KDIR
   unset CLANG_PATH
+  unset RUST_PATH
   unset CROSS_COMPILE
   unset ARCH
   unset LLVM
@@ -677,14 +704,24 @@ local_shell() {
   echo "Starting interactive shell for target: $TARGET"
   echo ""
 
-  local clang
+  local clang rust
 
   clang=$(get_clang_for_target "$TARGET")
+  rust=$(get_rust_for_target "$TARGET")
 
   # Setup environment variables for the subshell
   export KDIR="$DDK_ROOT/kdir/$TARGET"
   export CLANG_PATH="$DDK_ROOT/clang/$clang/bin"
   export PATH="$CLANG_PATH:$PATH"
+
+  # Setup Rust if available
+  if [[ -n "$rust" ]]; then
+    export RUST_PATH="$DDK_ROOT/rust/$rust/bin"
+    if [[ -d "$RUST_PATH" ]]; then
+      export PATH="$RUST_PATH:$PATH"
+    fi
+  fi
+
   export CROSS_COMPILE=aarch64-linux-gnu-
   export ARCH=arm64
   export LLVM=1
@@ -712,6 +749,9 @@ local_shell() {
   echo "  DDK_ROOT=$DDK_ROOT"
   echo "  KDIR=$KDIR"
   echo "  CLANG_PATH=$CLANG_PATH"
+  if [[ -n "${RUST_PATH:-}" ]]; then
+    echo "  RUST_PATH=$RUST_PATH"
+  fi
   echo "  CROSS_COMPILE=$CROSS_COMPILE"
   echo "  ARCH=$ARCH"
   echo "  LLVM=$LLVM"
