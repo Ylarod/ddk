@@ -85,28 +85,55 @@ def setup_clang_prebuilt(version):
 
 # ── rust ───────────────────────────────────────────────
 
+# AOSP 的 rust 预编译包里没有 bindgen，而内核的 scripts/rust_is_available.sh 找不到
+# bindgen 就会静默关掉 CONFIG_RUST。bindgen 在 clang-tools 仓库，跟着 manifest 的
+# default revision 走（和 rust 的 branch 同一个），是个自包含的二进制，直接放进
+# rust 的 bin/ 即可 —— 那个目录已经在 PATH 上（_make_kernel_env 与各 Dockerfile）
+BINDGEN_REPO = "platform/prebuilts/clang-tools"
+BINDGEN_PATH = "linux-x86/bin/bindgen"
+
+
+def ensure_bindgen(dest, branch):
+    bindgen = dest / "bin" / "bindgen"
+    if bindgen.is_file():
+        print(f"[!] bindgen already exists in {dest.name}, skip")
+        return
+    url = (f"https://android.googlesource.com/{BINDGEN_REPO}"
+           f"/+/refs/heads/{branch}/{BINDGEN_PATH}?format=TEXT")
+    print(f"[+] Download bindgen from {url}")
+    encoded = dest / "bin" / "bindgen.b64"
+    # gitiles 单文件下载只提供 base64，分两步避免管道吞掉 wget 的失败
+    run(f"wget -q '{url}' -O {encoded}")
+    run(f"base64 -d {encoded} > {bindgen}")
+    encoded.unlink()
+    bindgen.chmod(0o755)
+
+
 def setup_rust_download(version, branch, repo):
     ver_num = version.removeprefix("rust-")
     dest = DDK_ROOT / "rust" / version
     if dest.is_dir():
         print(f"[!] {version} already exists, skip")
-        return
-    # platform/prebuilts/rust (旧仓库) 需要额外拼 linux-x86 子路径
-    if repo == "platform/prebuilts/rust":
-        archive_path = f"linux-x86/{ver_num}"
     else:
-        archive_path = ver_num
-    url = f"https://android.googlesource.com/{repo}/+archive/refs/heads/{branch}/{archive_path}.tar.gz"
-    print(f"[+] Download from {url}")
-    tarball = f"{version}.tar.gz"
-    run(f"wget {url} -O {tarball}")
-    dest.mkdir(parents=True, exist_ok=True)
-    run(f"tar xzf {tarball} -C {dest}")
-    os.remove(tarball)
+        # platform/prebuilts/rust (旧仓库) 需要额外拼 linux-x86 子路径
+        if repo == "platform/prebuilts/rust":
+            archive_path = f"linux-x86/{ver_num}"
+        else:
+            archive_path = ver_num
+        url = f"https://android.googlesource.com/{repo}/+archive/refs/heads/{branch}/{archive_path}.tar.gz"
+        print(f"[+] Download from {url}")
+        tarball = f"{version}.tar.gz"
+        run(f"wget {url} -O {tarball}")
+        dest.mkdir(parents=True, exist_ok=True)
+        run(f"tar xzf {tarball} -C {dest}")
+        os.remove(tarball)
+    ensure_bindgen(dest, branch)
 
 
-def setup_rust_prebuilt(version):
+def setup_rust_prebuilt(version, branch):
     extract_prebuilt("rust", version, DDK_ROOT / "rust")
+    # 老的 rust tarball 打包时还没有 bindgen，这里补上
+    ensure_bindgen(DDK_ROOT / "rust" / version, branch)
 
 
 # ── src ────────────────────────────────────────────────
@@ -120,14 +147,32 @@ def setup_source_download(name, branch=None):
         return
     print(f"[+] Clone {name} (branch: {branch})")
     run(f"git clone https://android.googlesource.com/kernel/common -b {branch} --depth 1 {dest}")
-    modpost = dest / "scripts" / "mod" / "modpost.c"
-    if modpost.is_file():
-        run(f"sed -i 's/^\\(\\s*check_exports(mod);\\)/\\/\\/\\1/' {modpost}")
-        run(f"sed -i 's/^\\(\\s*s->module = exp->module;\\)/\\/\\/\\1/' {modpost}")
+    patch_modpost(dest)
+
+
+def patch_modpost(src_dir):
+    """放开 modpost 的符号校验，让外部模块可以引用不在 Module.symvers 里的符号"""
+    modpost = src_dir / "scripts" / "mod" / "modpost.c"
+    if not modpost.is_file():
+        return
+    run(f"sed -i 's/^\\(\\s*check_exports(mod);\\)/\\/\\/\\1/' {modpost}")
+    run(f"sed -i 's/^\\(\\s*s->module = exp->module;\\)/\\/\\/\\1/' {modpost}")
+    # 注释掉调用后 check_exports 变成未使用的 static 函数，clang-r584948c 起
+    # -Wunused-function 是 -Werror，必须标记为 unused。modpost.c 是 host 工具，
+    # 没有 __maybe_unused，用 __attribute__((unused))（该文件已在别处使用）
+    run(f"sed -i 's/^static void check_exports(/static void __attribute__((unused)) check_exports(/' {modpost}")
+    # check_exports 不跑，s->module 恒为 NULL，add_extended_versions() 一条名字都不发，
+    # 生成的 .mod.c 里就是 `____version_ext_names[] ... =\n;` —— 空的字符串初始化器不合法
+    # （空的 {} 反而合法，所以只有 names 这个炸）。开 CONFIG_RUST 会带出
+    # CONFIG_EXTENDED_MODVERSIONS，这条路径才会被走到。补一个空串让它退化成合法 C
+    run(r"""sed -i 's|__version_ext_names\\") =\\n|__version_ext_names\\") = \\"\\"\\n|' """
+        + str(modpost))
 
 
 def setup_source_prebuilt(name):
     extract_prebuilt("src", name, DDK_ROOT / "src", prefix="src.")
+    # 老的 src tarball 是用旧补丁打的，缺后面两条，这里补齐（sed 都是幂等的）
+    patch_modpost(DDK_ROOT / "src" / name)
 
 
 # ── build ──────────────────────────────────────────────
@@ -148,6 +193,10 @@ def _make_kernel_env(clang_version, rust_version=None):
         rust_bin = (DDK_ROOT / "rust" / rust_version / "bin").resolve()
         if rust_bin.is_dir():
             path_parts.append(str(rust_bin))
+        # bindgen 是 dlopen libclang 的，不指定就会去 /usr/lib* 摸系统的那份 ——
+        # 版本和内核用的 clang 对不上时会报 "unknown warning option"（内核的 CFLAGS
+        # 里有新 clang 才认识的 -W 选项），而且构建不封闭。指向配套的 clang 预编译包
+        env["LIBCLANG_PATH"] = str((DDK_ROOT / "clang" / clang_version / "lib").resolve())
     path_parts.append(env["PATH"])
     env["PATH"] = ":".join(path_parts)
     env["CROSS_COMPILE"] = "aarch64-linux-gnu-"
@@ -155,6 +204,11 @@ def _make_kernel_env(clang_version, rust_version=None):
     env["LLVM"] = "1"
     env["LLVM_IAS"] = "1"
     return env
+
+
+# GKI 从 android16-6.12 起使用 -fsanitize-cfi-icall-experimental-normalize-integers
+# 编译内核与模块，gki_defconfig 里没有这一项，需要手动打开才能让外部模块通过 CFI 校验
+CFI_NORMALIZE_INTEGERS_BRANCHES = {"android16-6.12", "android17-6.18"}
 
 
 def _configure_kernel(src_path, out_path_abs, env, lto=None, android_branch=None):
@@ -170,7 +224,7 @@ def _configure_kernel(src_path, out_path_abs, env, lto=None, android_branch=None
     elif lto == "full":
         run(f"{scripts_config} --file {config_file} -e LTO_CLANG -d LTO_NONE -d LTO_CLANG_THIN -e LTO_CLANG_FULL -d THINLTO", env=env)
 
-    if android_branch == "android16-6.12":
+    if android_branch in CFI_NORMALIZE_INTEGERS_BRANCHES:
         run(f"{scripts_config} --file {config_file} -e CONFIG_CFI_ICALL_NORMALIZE_INTEGERS", env=env)
 
 
@@ -374,7 +428,7 @@ def cmd_setup_toolchain(args):
     print("[+] Setup rust")
     for item in rust_list:
         if args.source == "prebuilt":
-            setup_rust_prebuilt(item["version"])
+            setup_rust_prebuilt(item["version"], item["branch"])
         else:
             setup_rust_download(item["version"], item["branch"], item["repo"])
 
@@ -411,12 +465,22 @@ def cmd_build(args):
         kdir = DDK_ROOT / "kdir"
         kdir_full = DDK_ROOT / "kdir-full"
 
-        # mv kdir -> kdir-full
-        if kdir.is_dir():
-            if kdir_full.is_dir():
-                shutil.rmtree(kdir_full)
-            print(f"[+] mv {kdir} -> {kdir_full}")
-            kdir.rename(kdir_full)
+        # 逐版本搬 kdir -> kdir-full，只动本次 matrix 里的版本。
+        # 整个目录 rename 的话，对第二个版本再跑 --min 会连带删掉上一个版本的
+        # kdir-full，fix_kdir_min 就没有头文件来源了
+        kdir_full.mkdir(parents=True, exist_ok=True)
+        for item in matrix_list:
+            android_ver = item.get("android")
+            if not android_ver:
+                continue
+            src_dir = kdir / android_ver
+            dst_dir = kdir_full / android_ver
+            if not src_dir.is_dir():
+                continue
+            if dst_dir.is_dir():
+                shutil.rmtree(dst_dir)
+            print(f"[+] mv {src_dir} -> {dst_dir}")
+            src_dir.rename(dst_dir)
 
         # 构建 modules_prepare -> kdir（精简版）
         for item in matrix_list:

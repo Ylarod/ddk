@@ -47,6 +47,7 @@ ENV DDK_ROOT=/opt/ddk \
     KERNEL_SRC=/opt/ddk/kdir/${ANDROID_VER} \
     KDIR=/opt/ddk/kdir/${ANDROID_VER} \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
+    LIBCLANG_PATH=/opt/ddk/clang/${CLANG_VER}/lib \
     PATH=/opt/ddk/clang/${CLANG_VER}/bin:/opt/ddk/rust/${RUST_VER}/bin:$PATH
 
 CMD ["/bin/bash"]

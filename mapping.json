@@ -27,11 +27,12 @@
     { "version": "clang-r450784e", "branch": "master-kernel-build-2022" },
     { "version": "clang-r487747c", "branch": "main-kernel-build-2023" },
     { "version": "clang-r510928",  "branch": "main-kernel-build-2024" },
-    { "version": "clang-r536225",  "branch": "main-kernel-2025" }
+    { "version": "clang-r536225",  "branch": "main-kernel-2025" },
+    { "version": "clang-r584948c", "branch": "main-kernel-2026" }
   ],
   "rust": [
     { "version": "rust-1.82.0", "branch": "main-kernel-2025", "repo": "platform/prebuilts/rust" },
-    { "version": "rust-1.91.1", "branch": "main-kernel-2026", "repo": "platform/prebuilts/rust-toolchain/linux-x86" }
+    { "version": "rust-1.91.1.p3", "branch": "main-kernel-2026", "repo": "platform/prebuilts/rust-toolchain/linux-x86" }
   ],
   "android": [
     { "name": "android12-5.10", "branch": "android12-5.10-lts" },
@@ -40,7 +41,8 @@
     { "name": "android14-5.15", "branch": "android14-5.15-lts" },
     { "name": "android14-6.1",  "branch": "android14-6.1-lts" },
     { "name": "android15-6.6",  "branch": "android15-6.6-lts" },
-    { "name": "android16-6.12", "branch": "android16-6.12-lts" }
+    { "name": "android16-6.12", "branch": "android16-6.12-lts" },
+    { "name": "android17-6.18", "branch": "android17-6.18-lts" }
   ],
   "matrix": [
     { "android": "android12-5.10", "clang": "clang-r416183b", "rust": null },
@@ -49,7 +51,8 @@
     { "android": "android14-5.15", "clang": "clang-r487747c", "rust": null },
     { "android": "android14-6.1",  "clang": "clang-r487747c", "rust": null },
     { "android": "android15-6.6",  "clang": "clang-r510928", "rust": null },
-    { "android": "android16-6.12", "clang": "clang-r536225", "rust": "rust-1.82.0" }
+    { "android": "android16-6.12", "clang": "clang-r536225", "rust": "rust-1.82.0" },
+    { "android": "android17-6.18", "clang": "clang-r584948c", "rust": "rust-1.91.1.p3" }
   ]
 }
 

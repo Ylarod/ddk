@@ -26,10 +26,11 @@ TARFLAGS=(
 )
 
 pack_dir() {
-    local prefix="$1" # src / kdir / clang / rust
+    local prefix="$1" # 文件名前缀: src / kdir / clang / rust
     local base_dir="$2" # 根目录
     local target_dir="$3" # 子目录名
-    local out_dir="$SCRIPT_DIR/../prebuilts/$prefix"
+    local out_prefix="${4:-$prefix}" # 输出目录名，默认与 prefix 相同
+    local out_dir="$SCRIPT_DIR/../prebuilts/$out_prefix"
     local mtime='2026-01-01 UTC'
     if [[ "$prefix" == "kdir" ]]; then
         mtime='2026-01-01 00:00:01 UTC'
@@ -61,14 +62,14 @@ pack_group() {
     if [[ -n "$version" ]]; then
         local d="$base_dir/$version"
         if [[ -d "$d" ]]; then
-            pack_dir "$out_prefix" "$base_dir" "$version"
+            pack_dir "$prefix" "$base_dir" "$version" "$out_prefix"
         else
             echo "⚠️  Skipping $prefix: $version not found under $base_dir"
         fi
     else
         for d in "$base_dir"/*; do
             [[ -d "$d" ]] || continue
-            pack_dir "$out_prefix" "$base_dir" "$(basename "$d")"
+            pack_dir "$prefix" "$base_dir" "$(basename "$d")" "$out_prefix"
         done
     fi
 }

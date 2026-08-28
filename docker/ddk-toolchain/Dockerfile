@@ -20,6 +20,7 @@ RUN --mount=type=bind,source=prebuilts/rust/,target=/mnt/rust,readonly \
 ENV DDK_ROOT=/opt/ddk \
     CLANG_PATH=/opt/ddk/clang/${CLANG_VER}/bin \
     RUST_PATH=/opt/ddk/rust/${RUST_VER}/bin \
+    LIBCLANG_PATH=/opt/ddk/clang/${CLANG_VER}/lib \
     PATH=/opt/ddk/clang/${CLANG_VER}/bin:/opt/ddk/rust/${RUST_VER}/bin:$PATH
 
 LABEL org.opencontainers.image.title="DDK toolchain ${CLANG_VER}" \
