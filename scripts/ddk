@@ -519,6 +519,9 @@ setup_local_env() {
     if [[ -d "$RUST_PATH" ]]; then
       export PATH="$RUST_PATH:$PATH"
     fi
+    # bindgen dlopen's libclang; without this it picks up the system one,
+    # which is usually too old for the kernel's CFLAGS
+    export LIBCLANG_PATH="$DDK_ROOT/clang/$clang/lib"
   fi
 
   export CROSS_COMPILE=aarch64-linux-gnu-
@@ -549,6 +552,7 @@ setup_local_env() {
   echo "  CLANG_PATH=$CLANG_PATH"
   if [[ -n "${RUST_PATH:-}" ]]; then
     echo "  RUST_PATH=$RUST_PATH"
+    echo "  LIBCLANG_PATH=$LIBCLANG_PATH"
   fi
   echo "  ARCH=$ARCH"
   if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
@@ -574,6 +578,7 @@ restore_local_env() {
   unset KDIR
   unset CLANG_PATH
   unset RUST_PATH
+  unset LIBCLANG_PATH
   unset CROSS_COMPILE
   unset ARCH
   unset LLVM
@@ -720,6 +725,9 @@ local_shell() {
     if [[ -d "$RUST_PATH" ]]; then
       export PATH="$RUST_PATH:$PATH"
     fi
+    # bindgen dlopen's libclang; without this it picks up the system one,
+    # which is usually too old for the kernel's CFLAGS
+    export LIBCLANG_PATH="$DDK_ROOT/clang/$clang/lib"
   fi
 
   export CROSS_COMPILE=aarch64-linux-gnu-
@@ -751,6 +759,7 @@ local_shell() {
   echo "  CLANG_PATH=$CLANG_PATH"
   if [[ -n "${RUST_PATH:-}" ]]; then
     echo "  RUST_PATH=$RUST_PATH"
+    echo "  LIBCLANG_PATH=$LIBCLANG_PATH"
   fi
   echo "  CROSS_COMPILE=$CROSS_COMPILE"
   echo "  ARCH=$ARCH"
