@@ -291,17 +291,195 @@ git add prebuilts
 
 ---
 
-## 步骤 5：镜像
+## 步骤 5：构建镜像
 
-镜像同样由 matrix 驱动，改完 mapping.json 就自动带上新版本：
+镜像同样由 matrix 驱动，改完 mapping.json 就自动带上新版本。
+**镜像在另一台机器上建**——构建机是 64 核跑编译的，镜像机只要 8 核，
+但要能拉 LFS 和推 registry。**地址同样每次重建都变，先问用户。**
 
-```bash
-make -C docker toolchains PUSH=1 REG=<registry>   # ddk-toolchain:$NEW（clang+rust+bindgen）
-make -C docker build      VER=$NEW PUSH=1
-make -C docker build-min  VER=$NEW PUSH=1
+镜像层级（都硬编码 `docker.cnb.cool/ylarod/ddk` 作为 base，所以 `REG` 保持默认）：
+
+```
+ddk-builder:latest                    基础环境（apt 那堆）
+  └─ ddk-toolchain:<ver>              解 clang + rust(含 bindgen) tar.zst
+       ├─ ddk:<ver>                   + src + kdir（全量）
+       └─ ddk-min:<ver>               + src + kdir-min
+ddk-cnb-dev:latest                    FROM ddk-builder，给 CNB 开发机用
 ```
 
-在 CNB 上通常走 `.cnb.yml` 的 web_trigger 按钮，不用手跑。
+### 5.1 准备镜像机
+
+这台的 `/workspace` 是 **ddk 仓库本身**（不是 ddk-prebuilts），和步骤 4 那台不一样。
+
+```bash
+IMG_SRV=<cnb-xxx@cnb.space>
+ssh $IMG_SRV 'nproc; free -g | head -2; df -h /; docker buildx ls | head -3'
+```
+
+精简镜像里**没有 make/jq**，先装（`.cnb.yml` 里那条 apt 就是干这个的）：
+
+```bash
+ssh $IMG_SRV 'apt-get update -qq && apt-get install -y -qq --no-install-recommends make jq'
+```
+
+registry 凭据 CNB 已经写好在 `~/.docker/config.json`（`docker.cnb.cool`），不用登录。
+
+拉代码 + submodule，**submodule 先 skip LFS，再按需单独拉**（全量 LFS 十几 GB，
+只建两个版本的话没必要）：
+
+```bash
+ssh $IMG_SRV 'cd /workspace
+git pull --ff-only
+GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --depth 1 prebuilts
+cd prebuilts && git lfs pull --include="\
+clang/clang-r536225.tar.zst,clang/clang-r584948c.tar.zst,\
+rust/rust-1.82.0.tar.zst,rust/rust-1.91.1.p3.tar.zst,\
+src/src.android16-6.12.tar.zst,src/src.android17-6.18.tar.zst,\
+kdir/kdir.android16-6.12.tar.zst,kdir/kdir.android17-6.18.tar.zst,\
+kdir-min/kdir.android16-6.12.tar.zst,kdir-min/kdir.android17-6.18.tar.zst"'
+```
+
+每个版本需要 5 个文件：`clang` / `rust` / `src` / `kdir` / `kdir-min`。
+拉完确认它们是实体文件（几百 MB～1 GB），没拉的仍是 134 字节指针。
+
+### 5.2 只建改动过的版本
+
+`make toolchains` 会遍历**整个 matrix**（8 个版本）。命令行覆盖 `MATRIX` 限定范围
+（make 的命令行赋值优先级高于 makefile 里的 `:=`）：
+
+```bash
+ssh $IMG_SRV 'cd /workspace
+M="android16-6.12:clang-r536225:rust-1.82.0 android17-6.18:clang-r584948c:rust-1.91.1.p3"
+make -C docker list MATRIX="$M"        # 先确认覆盖生效，只列出这两个
+make -C docker toolchains PUSH=1 MATRIX="$M"'
+```
+
+`build` / `build-min` 有单版本入口，不用覆盖 MATRIX：
+
+```bash
+for V in android16-6.12 android17-6.18; do
+  make -C docker build     VER=$V PUSH=1
+  make -C docker build-min VER=$V PUSH=1
+done
+```
+
+**顺序不能反**：`ddk` 和 `ddk-min` 都 `FROM ddk-toolchain:<ver>`，toolchain 必须先推上去。
+
+`PUSH=1` 走 `buildx --push`，不落本地，所以 `toolchains` 里那个
+"镜像已存在就跳过" 的判断永远不成立，每次都会重建。
+
+单个镜像 export+push 约 3 分钟（ddk 解压后 ~15 GB），四个镜像 15–20 分钟。
+轮询：
+
+```bash
+ssh $IMG_SRV 'grep -a "==> Building\|ERROR" /tmp/img-all.log | tail
+              grep -a -c "pushing manifest for" /tmp/img-all.log'
+```
+
+### 5.3 验镜像
+
+```bash
+for t in ddk-toolchain ddk ddk-min; do
+  for v in android16-6.12 android17-6.18; do
+    printf "%-34s " "$t:$v"
+    docker manifest inspect docker.cnb.cool/ylarod/ddk/$t:$v >/dev/null 2>&1 && echo OK || echo MISSING
+  done
+done
+```
+
+再从 registry 拉一个下来真编一次。**CNB 的 docker 是独立服务，`-v` 挂的是 daemon
+那边的路径，宿主机上写的文件容器里看不到**，所以源码要在容器内生成：
+
+```bash
+docker run --rm docker.cnb.cool/ylarod/ddk/ddk-min:android17-6.18 bash -c '
+set -e
+mkdir -p /tmp/tm && cd /tmp/tm
+cat > hello.c <<EOF
+#include <linux/module.h>
+static int __init m_init(void) { return 0; }
+static void __exit m_exit(void) {}
+module_init(m_init);
+module_exit(m_exit);
+MODULE_LICENSE("GPL");
+EOF
+echo "obj-m += hello.o" > Makefile
+bindgen --version; rustc --version
+make -C "$KDIR" M=/tmp/tm modules
+file /tmp/tm/hello.ko'
+```
+
+镜像里 `ARCH` / `LLVM` / `CROSS_COMPILE` / `KDIR` / `LIBCLANG_PATH` 都是 ENV，
+不用再传。结果应为 `ELF 64-bit LSB relocatable, ARM aarch64`。
+
+### 5.4 全量重建
+
+要重建所有版本时用仓库根目录的 `build.sh`（`build-min-all` → `build-all` → `cnb-dev`）。
+注意它**不含 `toolchains`**，新版本的 toolchain 镜像得先单独建。
+`ddk-cnb-dev` 需要 `prebuilts/clang/` 和 `prebuilts/rust/` 的全部 LFS 文件。
+
+CNB 上也可以走 `.cnb.yml` 的 web_trigger 按钮，不用手跑。
+
+---
+
+## 步骤 6：日期 tag + 同步到 GHCR / Docker Hub
+
+### 6.1 给 CNB 镜像打日期 tag
+
+`DATE` 用 `date +%Y%m%d`（如 `20260828`）。这是**整套镜像的快照标记**，
+所以三个仓库（`ddk` / `ddk-min` / `ddk-toolchain`）× mapping.json 里**全部** android
+版本都要打，不只是这次改动的那两个 —— 少几个的话快照就不完整了。
+
+`build/tag-image.sh` 是按 `docker image ls` 找**本地**镜像的，而步骤 5 用 `PUSH=1`
+（`buildx --push`）根本不落本地，所以那个脚本在这条路径上找不到东西。
+直接用 `imagetools create` 在 registry 侧改名，不拉不推任何层：
+
+```bash
+ssh $IMG_SRV 'cd /workspace
+DATE=20260828
+for repo in ddk ddk-min ddk-toolchain; do
+  jq -r ".android[].name" mapping.json | while IFS= read -r v; do
+    SRC="docker.cnb.cool/ylarod/ddk/$repo:$v"
+    DST="docker.cnb.cool/ylarod/ddk/$repo:$v-$DATE"
+    docker buildx imagetools create --tag "$DST" "$SRC" \
+      && echo "OK    $repo:$v-$DATE" || echo "FAIL  $repo:$v-$DATE"
+  done
+done'
+```
+
+打之前先确认源 tag 都在：
+
+```bash
+docker buildx imagetools inspect docker.cnb.cool/ylarod/ddk/$repo:$v >/dev/null 2>&1
+```
+
+> CNB 开发机的 shell 是 **zsh**，`for v in $VERS` 不做分词，会把整段当成一个元素
+> （表现为只处理第一个、后面全被 echo 出来）。遍历一律用
+> `jq ... | while IFS= read -r v`，别用 `for ... in $VAR`。
+
+### 6.2 推 git
+
+镜像 tag 打完再推 git，github 和 cnb 两个 remote 都要推。
+
+### 6.3 跑 GitHub 的 sync workflow
+
+`.github/workflows/sync-image.yml` 是 `workflow_dispatch`，有一个可选的 `date` 输入：
+
+```bash
+gh workflow run sync-image.yml -f date=20260828
+gh run watch "$(gh run list --workflow=sync-image.yml -L1 --json databaseId -q '.[0].databaseId')"
+```
+
+它做两件事，链路是 **CNB → GHCR → Docker Hub**：
+
+1. `sync-toolchain`：`ddk-toolchain:<ver>`，矩阵取自 `mapping.json` 的 `.matrix`
+2. `sync-image`：`ddk:<ver>` 和 `ddk-min:<ver>`，矩阵取自 `.android`，依赖上一步
+
+填了 `date` 的话每个 tag 同步两遍：一次不带日期，一次 `--new-date`。
+注意 `--new-date` 的语义是 **`src:ver -> dst:ver-<date>`** —— 读的是**不带日期**的源 tag，
+在目标端写出带日期的 tag。所以 CI **不依赖** CNB 上有日期 tag，
+6.1 那步是给 CNB 自己留快照，两件事互相独立。
+
+矩阵直接来自 mapping.json，新版本加进去就自动带上，workflow 本身不用改。
 
 ---
 
@@ -317,6 +495,11 @@ make -C docker build-min  VER=$NEW PUSH=1
 - [ ] 五个 tarball 齐全、`kdir-min` 里叫 `kdir.<ver>.tar.zst`
 - [ ] 冒烟测试编出 aarch64 `.ko`
 - [ ] 本地全程 `GIT_LFS_SKIP_SMUDGE=1`
+- [ ] 镜像机上 `make`/`jq` 装了，submodule 按需拉 LFS
+- [ ] `toolchains` 先于 `build`/`build-min`，且用 MATRIX 覆盖限定版本
+- [ ] 六个镜像 `docker manifest inspect` 都 OK，拉下来能真编出 `.ko`
+- [ ] CNB 上三个仓库 × 全部版本都打了 `-<date>` tag
+- [ ] git 推了 github + cnb，`sync-image.yml` 带 `date` 跑通
 
 ## 坑
 
@@ -345,6 +528,11 @@ make -C docker build-min  VER=$NEW PUSH=1
   启动下一个构建，但不传 `--lto` 时 `gki_defconfig` 出来是 `CONFIG_LTO_NONE=y`，
   日志里 "LTO" 出现 0 次，触发条件永远不命中，实际是串行。要重叠得传 `--lto thin/full`
   （会改变 kdir 配置，和现有版本不一致）。LTO_NONE 下 `-j64` 已经吃满并行，收益不大。
+- **镜像机是另一台**：`/workspace` 在那边是 **ddk 仓库本身**，不是 ddk-prebuilts；
+  而且是精简镜像，**没装 make/jq**。`make toolchains` 没有单版本入口，
+  要靠命令行覆盖 `MATRIX` 限定范围。
+- **CNB 的 docker 是独立服务**：`docker run -v /host/path:/x` 挂的是 daemon 那边的
+  路径，宿主机上刚写的文件在容器里是空的。验镜像时源码要在容器内生成。
 - **本地 LFS**：忘了 `GIT_LFS_SKIP_SMUDGE=1` 会拖十几 GB 下来。
 - **SSH 断连**：CNB 开发机重建后地址会变，出现 `Received disconnect ... 22:11`
   就是环境没了，向用户要新地址，别反复重试。
